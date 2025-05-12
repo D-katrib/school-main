@@ -1,0 +1,225 @@
+/* Custom styles to complement Bootstrap */
+
+/* App container */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+/* Logo styling */
+.logo {
+  height: 3rem;
+  transition: transform 0.3s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+/* Animation for logo */
+@keyframes logo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spin-logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.slide-in-up {
+  animation: slideInUp 0.3s ease-out;
+}
+
+/* Page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Custom colors */
+.bg-school-primary {
+  background-color: #3b82f6;
+}
+
+.text-school-primary {
+  color: #3b82f6;
+}
+
+/* Custom utilities */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Custom button hover effects */
+.btn {
+  transition: all 0.3s;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Card hover effects */
+.card {
+  transition: transform 0.3s, box-shadow 0.3s;
+  background-color: #fff;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Layout styles */
+.sidebar {
+  width: 280px;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: -280px;
+  z-index: 1040;
+  transition: left 0.3s ease;
+}
+
+.sidebar-expanded {
+  left: 0;
+}
+
+.content-wrapper {
+  width: 100%;
+  margin-left: 0;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+  background-color: #f8f9fa;
+}
+
+/* Desktop styles */
+@media (min-width: 992px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+  }
+  
+  .content-wrapper {
+    margin-left: 280px;
+    width: calc(100% - 280px);
+  }
+}
+
+/* Navbar styling */
+.navbar {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/* Ekstra Bootstrap sınıflarına stil tanımlamaları */
+.nav, .nav-item, .nav-link {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+.dropdown, .dropdown-menu, .dropdown-item {
+  visibility: visible !important;
+}
+
+.modal, .modal-dialog, .modal-content {
+  visibility: visible !important;
+  display: block !important;
+}
+
+.modal.show {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Temel grid yapılarının görünmesini sağla */
+.container > .row,
+.container-fluid > .row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  visibility: visible !important;
+}
+
+/* Responsive tasarım için */
+@media (max-width: 991.98px) {
+  .navbar-collapse {
+    display: flex !important;
+    flex-basis: 100%;
+    flex-grow: 1;
+    align-items: center;
+  }
+  
+  .navbar-toggler {
+    display: block !important;
+  }
+  
+  .navbar-expand-lg .navbar-nav {
+    flex-direction: column !important;
+  }
+}
