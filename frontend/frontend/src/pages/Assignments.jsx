@@ -19,8 +19,9 @@ const Assignments = () => {
       try {
         setLoading(true);
         const response = await assignmentService.getAssignments();
-        // Convert object to array if needed
-        const assignmentsArray = Array.isArray(response.data) ? response.data : Object.values(response.data);
+        // Correctly access the data from the API response structure
+        const assignmentsArray = response.data.data || [];
+        console.log('Assignments fetched:', assignmentsArray);
         setAssignments(assignmentsArray);
       } catch (error) {
         console.error('Error fetching assignments:', error);
@@ -178,9 +179,9 @@ const Assignments = () => {
                       <p className="text-muted small mt-2">
                         Due: {formatDate(assignment.dueDate)}
                       </p>
-                      {assignment.points && (
+                      {assignment.totalPoints && (
                         <p className="text-muted small mt-1">
-                          Points: {assignment.points}
+                          Points: {assignment.totalPoints}
                         </p>
                       )}
                     </div>

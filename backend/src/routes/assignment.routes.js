@@ -11,6 +11,7 @@ const {
 } = require('../controllers/assignment.controller');
 
 const { protect, authorize } = require('../middleware/auth.middleware');
+const { upload, handleUploadError } = require('../services/upload.service');
 
 const router = express.Router();
 
@@ -238,7 +239,7 @@ router.get('/:id', getAssignment);
  *       403:
  *         description: Forbidden
  */
-router.post('/', authorize('admin', 'teacher'), createAssignment);
+router.post('/', authorize('admin', 'teacher'), upload.array('files'), handleUploadError, createAssignment);
 
 /**
  * @swagger
@@ -290,7 +291,7 @@ router.post('/', authorize('admin', 'teacher'), createAssignment);
  *       404:
  *         description: Assignment not found
  */
-router.put('/:id', authorize('admin', 'teacher'), updateAssignment);
+router.put('/:id', authorize('admin', 'teacher'), upload.array('files'), handleUploadError, updateAssignment);
 
 /**
  * @swagger
@@ -397,6 +398,6 @@ router.get('/:id/submissions', authorize('admin', 'teacher'), getSubmissions);
 router.put('/submissions/:id', authorize('admin', 'teacher'), gradeSubmission);
 
 // Student routes
-router.post('/:id/submit', authorize('student'), submitAssignment);
+router.post('/:id/submit', authorize('student'), upload.array('files'), handleUploadError, submitAssignment);
 
 module.exports = router;

@@ -301,17 +301,23 @@ exports.deleteAssignment = async (assignmentId, user) => {
     throw error;
   }
   
-  // Check if course exists and user is authorized
+  // Get the course to check teacher permissions
   const course = await Course.findById(assignment.course);
   
-  // Make sure user is course teacher or admin
-  if (user.role === 'teacher' && course.teacher.toString() !== user.id) {
+  if (!course) {
+    const error = new Error(`Course not found for this assignment`);
+    error.statusCode = 404;
+    throw error;
+  }
+  
+  // Check if user is admin or the teacher of the course
+  if (user.role !== 'admin' && (user.role !== 'teacher' || course.teacher.toString() !== user.id)) {
     const error = new Error('Not authorized to delete this assignment');
     error.statusCode = 403;
     throw error;
   }
   
-  await assignment.remove();
+  await assignment.deleteOne();
   return true;
 };
 

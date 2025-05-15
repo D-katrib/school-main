@@ -13,6 +13,9 @@ import EditCourse from './pages/EditCourse';
 import EnrollmentRequests from './pages/EnrollmentRequests';
 import Assignments from './pages/Assignments';
 import AssignmentDetail from './pages/AssignmentDetail';
+import AddAssignment from './pages/AddAssignment';
+import EditAssignment from './pages/EditAssignment';
+import SubmissionDetail from './pages/SubmissionDetail';
 import Attendance from './pages/Attendance';
 import Grades from './pages/Grades';
 import Profile from './pages/Profile';
@@ -53,8 +56,10 @@ function App() {
               <Route path="/courses/:id" element={<CourseDetail />} />
               <Route path="/enrollment-requests" element={<EnrollmentRequests />} />
               <Route path="/assignments" element={<Assignments />} />
-              <Route path="/assignments/new" element={<AssignmentDetail />} />
+              <Route path="/assignments/new" element={<AddAssignment />} />
+              <Route path="/assignments/edit/:id" element={<EditAssignment />} />
               <Route path="/assignments/:id" element={<AssignmentDetail />} />
+              <Route path="/assignments/:assignmentId/submissions/:submissionId" element={<SubmissionDetail />} />
               <Route path="/attendance" element={<Attendance />} />
               <Route path="/grades" element={<Grades />} />
               <Route path="/profile" element={<Profile />} />

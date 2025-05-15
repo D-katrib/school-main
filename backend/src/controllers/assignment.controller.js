@@ -45,7 +45,25 @@ exports.getAssignment = async (req, res, next) => {
  */
 exports.createAssignment = async (req, res, next) => {
   try {
-    const assignment = await assignmentService.createAssignment(req.body, req.user);
+    // Handle file uploads if any
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      const uploadService = require('../services/upload.service');
+      attachments = req.files.map(file => ({
+        fileName: file.originalname,
+        fileUrl: uploadService.getFileUrl(req, file.filename, 'assignments'),
+        fileType: file.mimetype,
+        uploadDate: Date.now()
+      }));
+    }
+    
+    // Merge attachments with request body
+    const assignmentData = {
+      ...req.body,
+      attachments: attachments.length > 0 ? attachments : req.body.attachments
+    };
+    
+    const assignment = await assignmentService.createAssignment(assignmentData, req.user);
     
     res.status(201).json({
       success: true,
@@ -63,7 +81,25 @@ exports.createAssignment = async (req, res, next) => {
  */
 exports.updateAssignment = async (req, res, next) => {
   try {
-    const assignment = await assignmentService.updateAssignment(req.params.id, req.body, req.user);
+    // Handle file uploads if any
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      const uploadService = require('../services/upload.service');
+      attachments = req.files.map(file => ({
+        fileName: file.originalname,
+        fileUrl: uploadService.getFileUrl(req, file.filename, 'assignments'),
+        fileType: file.mimetype,
+        uploadDate: Date.now()
+      }));
+    }
+    
+    // Merge attachments with request body
+    const assignmentData = {
+      ...req.body,
+      attachments: attachments.length > 0 ? attachments : req.body.attachments
+    };
+    
+    const assignment = await assignmentService.updateAssignment(req.params.id, assignmentData, req.user);
     
     res.status(200).json({
       success: true,

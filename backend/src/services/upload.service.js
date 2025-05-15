@@ -6,7 +6,14 @@ const { v4: uuidv4 } = require('uuid');
 // Set up storage for uploaded files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/course-materials');
+    // Determine upload directory based on file type or route
+    let uploadDir;
+    
+    if (req.originalUrl.includes('/assignments')) {
+      uploadDir = path.join(__dirname, '../../uploads/assignments');
+    } else {
+      uploadDir = path.join(__dirname, '../../uploads/course-materials');
+    }
     
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
@@ -56,9 +63,9 @@ const handleUploadError = (err, req, res, next) => {
 };
 
 // Get file URL
-const getFileUrl = (req, filename) => {
+const getFileUrl = (req, filename, type = 'course-materials') => {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
-  return `${baseUrl}/uploads/course-materials/${filename}`;
+  return `${baseUrl}/uploads/${type}/${filename}`;
 };
 
 module.exports = {

@@ -188,11 +188,21 @@ export const enrollmentRequestService = {
 export const assignmentService = {
   getAssignments: () => api.get('/assignments'),
   getAssignmentById: (id) => api.get(`/assignments/${id}`),
-  createAssignment: (assignmentData) => api.post('/assignments', assignmentData),
-  updateAssignment: (id, assignmentData) => api.put(`/assignments/${id}`, assignmentData),
+  createAssignment: (assignmentData, isFormData = false) => {
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return api.post('/assignments', assignmentData, config);
+  },
+  updateAssignment: (id, assignmentData, isFormData = false) => {
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return api.put(`/assignments/${id}`, assignmentData, config);
+  },
   deleteAssignment: (id) => api.delete(`/assignments/${id}`),
-  submitAssignment: (assignmentId, submissionData) => api.post(`/assignments/${assignmentId}/submit`, submissionData),
+  submitAssignment: (assignmentId, submissionData, isFormData = false) => {
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    return api.post(`/assignments/${assignmentId}/submit`, submissionData, config);
+  },
   getSubmissions: (assignmentId) => api.get(`/assignments/${assignmentId}/submissions`),
+  gradeSubmission: (submissionId, gradeData) => api.put(`/assignments/submissions/${submissionId}`, gradeData),
 };
 
 // Attendance services
