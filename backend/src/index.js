@@ -20,6 +20,7 @@ const assignmentRoutes = require('./routes/assignment.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const gradeRoutes = require('./routes/grade.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const enrollmentRequestRoutes = require('./routes/enrollment-request.routes');
 
 // Import middlewares
 const { errorHandler } = require('./middleware/error.middleware');
@@ -51,6 +52,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/grades', gradeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/enrollment-requests', enrollmentRequestRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

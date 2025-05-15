@@ -29,7 +29,9 @@ const CourseSchema = new mongoose.Schema({
   }],
   grade: {
     type: Number,
-    required: [true, 'Please add a grade level']
+    required: [true, 'Please add a grade level'],
+    min: [1, 'Grade level must be at least 1'],
+    max: [100, 'Grade level cannot be more than 100']
   },
   academicYear: {
     type: String,
@@ -70,13 +72,27 @@ const CourseSchema = new mongoose.Schema({
     description: {
       type: String
     },
-    fileUrl: {
+    type: {
       type: String,
-      required: [true, 'Please add a file URL']
+      enum: ['file', 'video', 'link', 'text', 'other'],
+      required: [true, 'Please specify the material type']
+    },
+    url: {
+      type: String,
+      required: [true, 'Please add a URL for the material']
+    },
+    content: {
+      type: String,
+      // For text content or additional information
     },
     uploadDate: {
       type: Date,
       default: Date.now
+    },
+    addedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Please specify who added this material']
     }
   }],
   createdAt: {

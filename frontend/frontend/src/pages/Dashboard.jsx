@@ -82,17 +82,17 @@ const Dashboard = () => {
       try {
         // Fetch courses
         const coursesResponse = await courseService.getCourses();
-        if (coursesResponse.data && Array.isArray(coursesResponse.data) && coursesResponse.data.length > 0) {
-          setCourses(coursesResponse.data);
+        if (coursesResponse.data && coursesResponse.data.data && Array.isArray(coursesResponse.data.data) && coursesResponse.data.data.length > 0) {
+          setCourses(coursesResponse.data.data);
         }
         
         // Fetch assignments
         const assignmentsResponse = await assignmentService.getAssignments();
-        if (assignmentsResponse.data && Array.isArray(assignmentsResponse.data) && assignmentsResponse.data.length > 0) {
-          setAssignments(assignmentsResponse.data);
+        if (assignmentsResponse.data && assignmentsResponse.data.data && Array.isArray(assignmentsResponse.data.data) && assignmentsResponse.data.data.length > 0) {
+          setAssignments(assignmentsResponse.data.data);
           
           // Calculate upcoming assignments
-          const upcoming = assignmentsResponse.data.filter(a => {
+          const upcoming = assignmentsResponse.data.data.filter(a => {
             try {
               return a && a.dueDate && new Date(a.dueDate) > new Date();
             } catch (error) {
@@ -106,8 +106,8 @@ const Dashboard = () => {
         
         // Fetch notifications
         const notificationsResponse = await notificationService.getNotifications();
-        if (notificationsResponse.data && Array.isArray(notificationsResponse.data) && notificationsResponse.data.length > 0) {
-          setNotifications(notificationsResponse.data);
+        if (notificationsResponse.data && notificationsResponse.data.data && Array.isArray(notificationsResponse.data.data) && notificationsResponse.data.data.length > 0) {
+          setNotifications(notificationsResponse.data.data);
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);

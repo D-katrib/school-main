@@ -8,16 +8,37 @@ const Courses = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Schedule'ı formatlayan yardımcı fonksiyon
+  const formatSchedule = (schedule) => {
+    if (!schedule || !Array.isArray(schedule) || schedule.length === 0) {
+      return 'Not specified';
+    }
+    
+    // İlk 2 ders saatini göster, daha fazlaysa "..." ekle
+    return schedule.slice(0, 2).map(s => 
+      `${s.day} ${s.startTime}-${s.endTime}`
+    ).join(', ') + (schedule.length > 2 ? '...' : '');
+  };
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         setLoading(true);
         const response = await courseService.getCourses();
-        setCourses(response.data);
+        console.log('API Response:', response); // Debug için log eklendi
+        
+        if (response.data && response.data.data && Array.isArray(response.data.data)) {
+          setCourses(response.data.data);
+        } else {
+          console.error('Unexpected API response format:', response);
+          setError('Unexpected data format received from server');
+          setCourses([]);
+        }
       } catch (error) {
         console.error('Error fetching courses:', error);
-        setError('Failed to load courses');
+        setError('Failed to load courses: ' + (error.userMessage || error.message || 'Unknown error'));
+        setCourses([]);
       } finally {
         setLoading(false);
       }
@@ -73,7 +94,7 @@ const Courses = () => {
                       <span className="fw-medium">Teacher:</span> {course.teacher?.firstName} {course.teacher?.lastName}
                     </p>
                     <p className="card-text text-muted small mb-1">
-                      <span className="fw-medium">Schedule:</span> {course.schedule || 'Not specified'}
+                      <span className="fw-medium">Schedule:</span> {formatSchedule(course.schedule)}
                     </p>
                     <p className="card-text text-muted small mb-3">
                       <span className="fw-medium">Students:</span> {course.students?.length || 0}

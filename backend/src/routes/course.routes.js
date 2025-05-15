@@ -6,8 +6,19 @@ const {
   updateCourse,
   deleteCourse,
   enrollStudents,
-  unenrollStudents
+  unenrollStudents,
+  getCourseMaterials,
+  addCourseMaterial,
+  removeCourseMaterial
 } = require('../controllers/course.controller');
+
+// Import upload service
+const { upload, handleUploadError } = require('../services/upload.service');
+
+const {
+  createEnrollmentRequest,
+  getEnrollmentRequestsByCourse
+} = require('../controllers/enrollment-request.controller');
 
 const { protect, authorize } = require('../middleware/auth.middleware');
 
@@ -304,5 +315,17 @@ router.delete('/:id', authorize('admin'), deleteCourse);
  */
 router.put('/:id/enroll', authorize('admin', 'teacher'), enrollStudents);
 router.put('/:id/unenroll', authorize('admin', 'teacher'), unenrollStudents);
+
+// Course materials routes
+router.get('/:id/materials', protect, getCourseMaterials);
+router.post('/:id/materials', authorize('admin', 'teacher'), upload.single('file'), handleUploadError, addCourseMaterial);
+router.delete('/:id/materials/:materialId', authorize('admin', 'teacher'), removeCourseMaterial);
+
+// Route to serve uploaded files
+router.use('/uploads/course-materials', express.static('uploads/course-materials'));
+
+// Enrollment request routes
+router.post('/:id/enroll-request', authorize('student'), createEnrollmentRequest);
+router.get('/:id/enrollment-requests', authorize('admin', 'teacher'), getEnrollmentRequestsByCourse);
 
 module.exports = router;

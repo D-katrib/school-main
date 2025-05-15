@@ -8,6 +8,9 @@ import Register from './pages/Register';
 import NotFound from './pages/NotFound';
 import Courses from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
+import AddCourse from './pages/AddCourse';
+import EditCourse from './pages/EditCourse';
+import EnrollmentRequests from './pages/EnrollmentRequests';
 import Assignments from './pages/Assignments';
 import AssignmentDetail from './pages/AssignmentDetail';
 import Attendance from './pages/Attendance';
@@ -45,8 +48,10 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/courses" element={<Courses />} />
-              <Route path="/courses/new" element={<CourseDetail />} />
+              <Route path="/courses/new" element={<AddCourse />} />
+              <Route path="/courses/edit/:id" element={<EditCourse />} />
               <Route path="/courses/:id" element={<CourseDetail />} />
+              <Route path="/enrollment-requests" element={<EnrollmentRequests />} />
               <Route path="/assignments" element={<Assignments />} />
               <Route path="/assignments/new" element={<AssignmentDetail />} />
               <Route path="/assignments/:id" element={<AssignmentDetail />} />

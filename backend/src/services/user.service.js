@@ -3,9 +3,10 @@ const User = require('../models/user.model');
 /**
  * Get all users with filtering, sorting, and pagination
  * @param {Object} queryParams - Query parameters for filtering, sorting, and pagination
+ * @param {Object} user - Current user object
  * @returns {Object} Users and pagination data
  */
-exports.getUsers = async (queryParams) => {
+exports.getUsers = async (queryParams, user) => {
   // Build query
   let query;
   
@@ -25,7 +26,15 @@ exports.getUsers = async (queryParams) => {
   queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
   
   // Finding resource
-  query = User.find(JSON.parse(queryStr));
+  const parsedQuery = JSON.parse(queryStr);
+  
+  // Role-based filtering
+  if (user && user.role === 'teacher') {
+    // Teachers can only see students
+    parsedQuery.role = 'student';
+  }
+  
+  query = User.find(parsedQuery);
   
   // Select Fields
   if (queryParams.select) {
@@ -46,7 +55,7 @@ exports.getUsers = async (queryParams) => {
   const limit = parseInt(queryParams.limit, 10) || 25;
   const startIndex = (page - 1) * limit;
   const endIndex = page * limit;
-  const total = await User.countDocuments(JSON.parse(queryStr));
+  const total = await User.countDocuments(parsedQuery);
   
   query = query.skip(startIndex).limit(limit);
   
@@ -153,7 +162,7 @@ exports.deleteUser = async (userId) => {
     throw error;
   }
   
-  await user.remove();
+  await User.deleteOne({ _id: userId });
   return true;
 };
 

@@ -89,7 +89,7 @@ router.use(protect);
  *         description: Forbidden
  */
 router.route('/')
-  .get(authorize('admin'), getUsers)
+  .get(authorize('admin', 'teacher'), getUsers)
   .post(authorize('admin'), createUser);
 
 /**

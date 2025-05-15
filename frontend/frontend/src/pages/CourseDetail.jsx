@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { courseService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import StudentEnrollmentManager from '../components/StudentEnrollmentManager';
+import EnrollmentRequestManager from '../components/EnrollmentRequestManager';
+import CourseEnrollmentRequest from '../components/CourseEnrollmentRequest';
+import CourseMaterials from '../components/CourseMaterials';
 
 const CourseDetail = () => {
   const { id } = useParams();
@@ -26,25 +30,32 @@ const CourseDetail = () => {
     syllabus: ''
   });
 
+  const fetchCourse = async () => {
+    if (!id || id === 'new') {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await courseService.getCourseById(id);
+      console.log('Course API Response:', response); // Debug log
+      
+      if (response.data && response.data.data) {
+        setCourse(response.data.data);
+      } else {
+        console.error('Unexpected API response format:', response);
+        setError('Unexpected data format received from server');
+      }
+    } catch (error) {
+      console.error('Error fetching course:', error);
+      setError('Failed to load course details: ' + (error.userMessage || error.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCourse = async () => {
-      if (!id || id === 'new') {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await courseService.getCourseById(id);
-        setCourse(response.data);
-      } catch (error) {
-        console.error('Error fetching course:', error);
-        setError('Failed to load course details');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchCourse();
   }, [id]);
 
@@ -113,35 +124,62 @@ const CourseDetail = () => {
     }
   };
 
+  // Schedule'ı formatlayan yardımcı fonksiyon
+  const formatSchedule = (schedule) => {
+    if (!schedule || !Array.isArray(schedule) || schedule.length === 0) {
+      return 'Not specified';
+    }
+    
+    return schedule.map(s => 
+      `${s.day} ${s.startTime}-${s.endTime} (Room: ${s.room})`
+    ).join('\n');
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="container py-5">
+        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 text-red-700 bg-red-100 rounded-md dark:bg-red-900/20 dark:text-red-400">
-        {error}
+      <div className="container py-5">
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
       </div>
     );
   }
 
   if (id === 'new') {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <Link to="/courses" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
+      <div className="container py-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <Link to="/courses" className="btn btn-outline-primary">
+            <i className="bi bi-arrow-left me-2"></i>
             Back to Courses
           </Link>
+          {(currentUser?.role === 'admin' || (currentUser?.role === 'teacher' && course?.teacher?._id === currentUser.id)) && (
+            <div className="d-flex gap-2">
+              <Link to={`/courses/edit/${id}`} className="btn btn-outline-primary">
+                <i className="bi bi-pencil me-1"></i>
+                Edit
+              </Link>
+              <button onClick={handleDelete} className="btn btn-outline-danger">
+                <i className="bi bi-trash me-1"></i>
+                Delete
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div className="card shadow border-0 overflow-hidden mb-4">
           <h1 className="text-2xl font-bold mb-6">Create New Course</h1>
           
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -369,122 +407,226 @@ const CourseDetail = () => {
     );
   }
 
-  const isAdmin = currentUser?.role === 'admin';
-  const isTeacher = currentUser?.role === 'teacher' && course.teacher?._id === currentUser?._id;
-  const canEdit = isAdmin || isTeacher;
+  if (course) {
+    return (
+      <div className="container py-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <Link to="/courses" className="btn btn-outline-primary d-flex align-items-center">
+            <i className="bi bi-arrow-left me-2"></i>
+            Back to Courses
+          </Link>
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <Link to="/courses" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-          </svg>
-          Back to Courses
-        </Link>
-        {canEdit && (
-          <div className="flex space-x-2">
-            <Link to={`/courses/${id}/edit`} className="btn btn-secondary">
-              Edit Course
-            </Link>
-            <button onClick={handleDelete} className="btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500">
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-        <div className="h-48 bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
-          <h1 className="text-3xl font-bold text-white">{course.name}</h1>
+          {(currentUser.role === 'admin' || (currentUser.role === 'teacher' && currentUser._id === course.teacher._id)) && (
+            <div className="d-flex gap-2">
+              <button
+                onClick={handleDelete}
+                className="btn btn-danger"
+              >
+                <i className="bi bi-trash me-2"></i>
+                Delete Course
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <h2 className="text-xl font-semibold mb-4">Course Description</h2>
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                {course.description || 'No description available'}
-              </p>
+        <div className="card shadow border-0 overflow-hidden mb-4">
+          <div className="card-header bg-primary text-white p-4">
+            <h1 className="fs-3 fw-bold mb-1">{course.name}</h1>
+            <p className="small mb-0">Course Code: {course.code}</p>
+          </div>
 
-              <div className="mt-8">
-                <h2 className="text-xl font-semibold mb-4">Course Materials</h2>
-                {course.materials && course.materials.length > 0 ? (
-                  <ul className="space-y-2">
-                    {course.materials.map((material, index) => (
-                      <li key={index} className="flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <a 
-                          href={material.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-500 dark:text-blue-400"
-                        >
-                          {material.title}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400">No materials available</p>
-                )}
+          <div className="row g-0">
+            <div className="col-md-8 p-4">
+              <div className="card mb-4 border-0 bg-light">
+                <div className="card-body">
+                  <h2 className="fs-5 fw-bold mb-3">Course Description</h2>
+                  <p className="mb-0">
+                    {course.description || 'No description available'}
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <div className="card mb-6">
-                <h2 className="text-xl font-semibold mb-4">Course Details</h2>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Teacher</p>
-                    <p className="font-medium">
-                      {course.teacher?.firstName} {course.teacher?.lastName}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Schedule</p>
-                    <p className="font-medium">{course.schedule || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Room</p>
-                    <p className="font-medium">{course.room || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Credits</p>
-                    <p className="font-medium">{course.credits || 'Not specified'}</p>
-                  </div>
+              
+              <div className="card mb-4 border-0 bg-light">
+                <div className="card-body">
+                  <h2 className="fs-5 fw-bold mb-3">Schedule</h2>
+                  {course.schedule && course.schedule.length > 0 ? (
+                    <div className="table-responsive">
+                      <table className="table table-bordered table-hover">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Day</th>
+                            <th>Time</th>
+                            <th>Room</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {course.schedule.map((slot, index) => (
+                            <tr key={index}>
+                              <td>{slot.day}</td>
+                              <td>{slot.startTime} - {slot.endTime}</td>
+                              <td>{slot.room}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-muted mb-0">No schedule available</p>
+                  )}
                 </div>
               </div>
 
-              <div className="card">
-                <h2 className="text-xl font-semibold mb-4">Students</h2>
-                {course.students && course.students.length > 0 ? (
-                  <div className="space-y-3">
-                    {course.students.map((student) => (
-                      <div key={student._id} className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-3">
-                          {student.firstName.charAt(0)}{student.lastName.charAt(0)}
-                        </div>
+              <div className="card border-0 bg-light">
+                <div className="card-body">
+                  <h2 className="fs-5 fw-bold mb-3">Course Materials</h2>
+                  {course.materials && course.materials.length > 0 ? (
+                    <ul className="list-group list-group-flush">
+                      {course.materials.map((material, index) => (
+                        <li key={index} className="list-group-item bg-transparent d-flex align-items-center px-0">
+                          <i className="bi bi-file-earmark-text text-primary me-2 fs-5"></i>
+                          <a 
+                            href={material.fileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-decoration-none"
+                          >
+                            {material.title}
+                            <span className="ms-2 text-muted small">
+                              {new Date(material.uploadDate).toLocaleDateString()}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted mb-0">No materials available</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-4 p-4 bg-light">
+              <div className="card mb-4 border-0">
+                <div className="card-body">
+                  <h2 className="fs-5 fw-bold mb-3">Course Details</h2>
+                  <ul className="list-group list-group-flush">
+                    <li className="list-group-item bg-transparent px-0">
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-person-badge fs-4 text-primary me-3"></i>
                         <div>
-                          <p className="font-medium">
-                            {student.firstName} {student.lastName}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {student.email}
+                          <p className="small text-muted mb-0">Teacher</p>
+                          <p className="fw-medium mb-0">
+                            {course.teacher?.firstName} {course.teacher?.lastName}
                           </p>
                         </div>
                       </div>
-                    ))}
+                    </li>
+                    <li className="list-group-item bg-transparent px-0">
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-calendar3 fs-4 text-primary me-3"></i>
+                        <div>
+                          <p className="small text-muted mb-0">Academic Year</p>
+                          <p className="fw-medium mb-0">{course.academicYear || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </li>
+                    <li className="list-group-item bg-transparent px-0">
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-mortarboard fs-4 text-primary me-3"></i>
+                        <div>
+                          <p className="small text-muted mb-0">Grade Level</p>
+                          <p className="fw-medium mb-0">{course.grade || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </li>
+                    <li className="list-group-item bg-transparent px-0">
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-clock fs-4 text-primary me-3"></i>
+                        <div>
+                          <p className="small text-muted mb-0">Semester</p>
+                          <p className="fw-medium mb-0">{course.semester || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="card border-0 mb-4">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h2 className="fs-5 fw-bold mb-0">Students</h2>
+                    <span className="badge bg-primary rounded-pill">{course.students?.length || 0}</span>
                   </div>
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400">No students enrolled</p>
-                )}
+                  
+                  {course.students && course.students.length > 0 ? (
+                    <ul className="list-group list-group-flush">
+                      {course.students.map((student) => (
+                        <li key={student._id} className="list-group-item bg-transparent px-0 d-flex align-items-center">
+                          <div className="d-flex align-items-center justify-content-center bg-primary text-white rounded-circle me-3" 
+                               style={{ width: "40px", height: "40px" }}>
+                            {student.firstName?.charAt(0)}{student.lastName?.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="fw-medium mb-0">
+                              {student.firstName} {student.lastName}
+                            </p>
+                            <p className="small text-muted mb-0">
+                              {student.email}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-center py-4">
+                      <i className="bi bi-people fs-1 text-muted"></i>
+                      <p className="text-muted mt-2 mb-0">No students enrolled</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Student Enrollment Management for Teachers and Admins */}
+              {(currentUser?.role === 'admin' || (currentUser?.role === 'teacher' && course.teacher?._id === currentUser.id)) && (
+                <div className="mb-4">
+                  <StudentEnrollmentManager courseId={id} onEnrollmentChange={() => fetchCourse()} />
+                </div>
+              )}
+              
+              {/* Enrollment Request Manager for Teachers and Admins */}
+              {(currentUser?.role === 'admin' || (currentUser?.role === 'teacher' && course.teacher?._id === currentUser.id)) && (
+                <div className="mb-4">
+                  <EnrollmentRequestManager courseId={id} onRequestProcessed={() => fetchCourse()} />
+                </div>
+              )}
+              
+              {/* Course Enrollment Request for Students */}
+              {currentUser?.role === 'student' && !course.students?.some(student => student._id === currentUser.id) && (
+                <div className="mb-4">
+                  <CourseEnrollmentRequest courseId={id} courseName={course.name} onRequestSent={() => fetchCourse()} />
+                </div>
+              )}
+              
+              {/* Course Materials Section */}
+              <div className="card border-0 mb-4">
+                <div className="card-body">
+                  <CourseMaterials courseId={id} />
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Diğer durumlar için varsayılan görünüm
+  return (
+    <div className="container py-4">
+      <div className="alert alert-warning" role="alert">
+        <i className="bi bi-exclamation-triangle me-2"></i>
+        Beklenmeyen bir durum oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.
       </div>
     </div>
   );

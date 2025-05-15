@@ -143,12 +143,45 @@ export const userService = {
 // Course services
 export const courseService = {
   getCourses: () => api.get('/courses'),
+  getStudentCourses: () => api.get('/courses/my-courses'),
+  getCourseMaterials: (courseId) => {
+    return api.get(`/courses/${courseId}/materials`);
+  },
+  
+  // Add course material
+  addCourseMaterial: (courseId, materialData, isFormData = false) => {
+    const config = {};
+    
+    // If sending form data (for file uploads), set the appropriate content type
+    if (isFormData) {
+      config.headers = {
+        'Content-Type': 'multipart/form-data'
+      };
+    }
+    
+    return api.post(`/courses/${courseId}/materials`, materialData, config);
+  },
+  
+  // Remove course material
+  removeCourseMaterial: (courseId, materialId) => {
+    return api.delete(`/courses/${courseId}/materials/${materialId}`);
+  },
   getCourseById: (id) => api.get(`/courses/${id}`),
   createCourse: (courseData) => api.post('/courses', courseData),
   updateCourse: (id, courseData) => api.put(`/courses/${id}`, courseData),
   deleteCourse: (id) => api.delete(`/courses/${id}`),
-  enrollStudent: (courseId, studentId) => api.post(`/courses/${courseId}/enroll`, { studentId }),
-  removeStudent: (courseId, studentId) => api.delete(`/courses/${courseId}/students/${studentId}`),
+  enrollStudents: (courseId, studentIds) => api.put(`/courses/${courseId}/enroll`, { studentIds }),
+  unenrollStudents: (courseId, studentIds) => api.put(`/courses/${courseId}/unenroll`, { studentIds }),
+  getEnrollmentRequests: (courseId) => api.get(`/courses/${courseId}/enrollment-requests`),
+  processEnrollmentRequest: (requestId, status, notes) => api.put(`/enrollment-requests/${requestId}`, { status, notes }),
+};
+
+// Enrollment request services
+export const enrollmentRequestService = {
+  getMyRequests: () => api.get('/enrollment-requests'),
+  createRequest: (courseId) => api.post(`/courses/${courseId}/enroll-request`),
+  processRequest: (requestId, status, notes) => api.put(`/enrollment-requests/${requestId}`, { status, notes }),
+  cancelRequest: (requestId) => api.delete(`/enrollment-requests/${requestId}`),
 };
 
 // Assignment services

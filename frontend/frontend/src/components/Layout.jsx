@@ -10,7 +10,8 @@ import {
   BellIcon, 
   UserCircleIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  PlusCircleIcon
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
@@ -42,13 +43,22 @@ const Layout = () => {
     navigate('/login');
   };
 
-  const navigation = [
+  // Base navigation items for all users
+  const baseNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: AcademicCapIcon },
     { name: 'Courses', href: '/courses', icon: BookOpenIcon },
     { name: 'Assignments', href: '/assignments', icon: ClipboardDocumentListIcon },
     { name: 'Attendance', href: '/attendance', icon: UserGroupIcon },
     { name: 'Grades', href: '/grades', icon: ChartBarIcon },
   ];
+  
+  // Add role-specific navigation items
+  const navigation = [...baseNavigation];
+  
+  // Add enrollment requests link for students
+  if (currentUser?.role === 'student') {
+    navigation.push({ name: 'Enrollment Requests', href: '/enrollment-requests', icon: PlusCircleIcon });
+  }
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
