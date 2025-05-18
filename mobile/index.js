@@ -1,13 +1,5 @@
-import { registerRootComponent } from 'expo';
-import { ExpoRoot } from 'expo-router';
+import 'expo-router/entry';
 
-// Set the app directory for expo-router
-process.env.EXPO_ROUTER_APP_ROOT = './app';
-
-// Must be exported or Fast Refresh won't update the context
-export function App() {
-  const ctx = require.context('./app');
-  return <ExpoRoot context={ctx} />;
-}
-
-registerRootComponent(App);
+// This file is not used in the Expo Router setup, but we need it to satisfy
+// the main entry point specified in package.json
+// The actual entry point is handled by expo-router/entry

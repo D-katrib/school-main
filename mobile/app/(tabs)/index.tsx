@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '../../components/ThemedView';
+import { ThemedText } from '../../components/ThemedText';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { courseService } from '../../services/api';
 
 type IconName = "book" | "assignment" | "event-available" | "analytics" | "event" | "chat";
 type RouteDestination = "/(tabs)" | "/(tabs)/courses" | "/(tabs)/assignments" | "/(tabs)/profile";
@@ -57,18 +58,35 @@ export default function HomeScreen() {
       setApiStatus('checking');
       setApiError(null);
       
-      // Try to connect to the API
-      const response = await fetch('http://192.168.1.14:5000/api/courses');
-      
-      if (response.ok) {
+      try {
+        // Courses endpoint'ini kontrol edelim
+        const result = await courseService.getAllCourses();
+        console.log('API connection successful:', result);
         setApiStatus('connected');
-      } else {
-        setApiStatus('error');
-        setApiError(`API responded with status: ${response.status}`);
+      } catch (error: any) {
+        console.log('API connection error details:', error);
+        
+        // Eğer 401 hatası alırsak, bu API'nin çalıştığı ama kimlik doğrulama gerektirdiği anlamına gelir
+        if (error.response && error.response.status === 401) {
+          setApiStatus('connected');
+          setApiError('API requires authentication. Please log in first.');
+        } else if (error.response) {
+          // Başka bir HTTP hatası
+          setApiStatus('error');
+          setApiError(`API responded with status: ${error.response.status}`);
+        } else if (error.request) {
+          // İstek yapıldı ama yanıt alınamadı
+          setApiStatus('error');
+          setApiError('API server is unreachable. Check your network connection or server address.');
+        } else {
+          // İstek oluşturulurken bir hata oluştu
+          setApiStatus('error');
+          setApiError(`API connection error: ${error.message || 'Unknown error'}`);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       setApiStatus('error');
-      setApiError(`API connection error: ${err instanceof Error ? err.message : String(err)}`);
+      setApiError(`Unexpected error: ${err?.message || 'Unknown error'}`);
       console.error('API connection error:', err);
     }
   };

@@ -1,10 +1,6 @@
-import { AuthProvider } from '../contexts/AuthContext';
-import RootLayout from './_layout';
+import { Redirect } from 'expo-router';
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <RootLayout />
-    </AuthProvider>
-  );
+// Ana sayfa, kullanıcıyı (tabs) klasöründeki index sayfasına yönlendirir
+export default function Index() {
+  return <Redirect href="/(tabs)/" />;
 } 
