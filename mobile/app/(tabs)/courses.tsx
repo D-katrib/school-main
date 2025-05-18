@@ -1,68 +1,68 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { courseService } from '@/services/api';
 
-interface Course {
-  id: string;
-  name: string;
-  teacher: string;
-  code: string;
+interface Teacher {
+  _id: string;
+  firstName: string;
+  lastName: string;
 }
 
-// Mock data - replace with API call to your backend
-const MOCK_COURSES: Course[] = [
-  { id: '1', name: 'Mathematics', teacher: 'Prof. Johnson', code: 'MATH101' },
-  { id: '2', name: 'Physics', teacher: 'Dr. Smith', code: 'PHYS201' },
-  { id: '3', name: 'Computer Science', teacher: 'Dr. Garcia', code: 'CS301' },
-  { id: '4', name: 'Biology', teacher: 'Prof. Wilson', code: 'BIO101' },
-  { id: '5', name: 'Chemistry', teacher: 'Dr. Lee', code: 'CHEM201' },
-];
+interface Course {
+  _id: string;
+  name: string;
+  teacher: Teacher;
+  code: string;
+  description: string;
+}
 
 export default function CoursesScreen() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulating API call with setTimeout
-    const timer = setTimeout(() => {
-      setCourses(MOCK_COURSES);
-      setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-    
-    // When connecting to real backend:
-    // async function fetchCourses() {
-    //   try {
-    //     const response = await fetch('http://your-backend-url/api/courses');
-    //     const data = await response.json();
-    //     setCourses(data);
-    //   } catch (error) {
-    //     console.error('Error fetching courses:', error);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // }
-    // fetchCourses();
+    fetchCourses();
   }, []);
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      const response = await courseService.getAllCourses();
+      if (response.data && Array.isArray(response.data.data)) {
+        setCourses(response.data.data);
+      } else {
+        console.error('Unexpected API response format:', response);
+        Alert.alert('Error', 'Failed to load courses. Unexpected data format.');
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      Alert.alert('Error', 'Failed to load courses');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderCourseItem = ({ item }: { item: Course }) => (
     <TouchableOpacity 
       style={styles.courseCard}
       onPress={() => {
-        // For now, just navigate back to home as a placeholder
-        // In a real app, you'd implement a course detail page
-        router.push('/(tabs)');
+        // Navigate to course detail screen
+        // Using a simpler approach that works with TypeScript
+        // @ts-ignore - Expo Router types are sometimes too strict
+        router.push(`/course/${item._id}`);
       }}
     >
       <ThemedView style={styles.courseContent}>
         <ThemedText type="subtitle">{item.name}</ThemedText>
         <ThemedText>{item.code}</ThemedText>
-        <ThemedText style={styles.teacherText}>{item.teacher}</ThemedText>
+        <ThemedText style={styles.teacherText}>
+          {item.teacher ? `${item.teacher.firstName} ${item.teacher.lastName}` : 'Unknown Teacher'}
+        </ThemedText>
       </ThemedView>
       <Ionicons name="chevron-forward" size={24} color="#888" />
     </TouchableOpacity>
@@ -82,7 +82,7 @@ export default function CoursesScreen() {
         <FlatList
           data={courses}
           renderItem={renderCourseItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContainer}
         />
       )}

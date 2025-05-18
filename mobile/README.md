@@ -1,8 +1,33 @@
-# Welcome to your Expo app 👋
+# School Management Mobile App 📚
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is the mobile application for the School Management System, built with [Expo](https://expo.dev) and React Native. This app allows students, teachers, and administrators to access the school management system on the go.
 
-## Get started
+## Features
+
+- **Course Management**: View course details, materials, and schedules
+- **Assignment Management**: View, submit, and track assignments
+- **File Uploads**: Upload files for assignments and course materials
+- **Authentication**: Secure login and token-based authentication
+
+## Dependencies
+
+- Expo SDK
+- React Navigation
+- Expo Router for file-based routing
+- Expo Document Picker for file uploads
+- Expo Web Browser for viewing documents
+- Axios for API requests
+- AsyncStorage for local data storage
+
+## API Integration
+
+The mobile app connects to the same backend API as the web application. The API service is configured in `services/api.ts` and includes endpoints for:
+
+- Authentication (login, register, profile management)
+- Courses (listing, details, materials)
+- Assignments (viewing, submission)
+
+## Getting Started
 
 1. Install dependencies
 
@@ -10,41 +35,64 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Configure API URL
+
+   Update the API URL in `services/api.ts` to point to your backend server.
+
+3. Start the app
 
    ```bash
-    npx expo start
+   npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+In the output, you'll find options to open the app in a:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- [Expo Go](https://expo.dev/go) on your physical device
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Project Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+mobile/
+├── app/                  # Main application code using Expo Router
+│   ├── (tabs)/           # Tab-based navigation screens
+│   │   ├── index.tsx     # Home screen
+│   │   ├── courses.tsx   # Courses listing screen
+│   │   └── assignments.tsx # Assignments screen
+│   ├── course/           # Course-related screens
+│   │   ├── [id].tsx      # Course detail screen
+│   │   └── material.tsx  # Material viewer
+│   ├── assignment/       # Assignment-related screens
+│   │   └── [id].tsx      # Assignment detail and submission screen
+│   └── login.tsx         # Authentication screen
+├── components/           # Reusable UI components
+├── contexts/             # React contexts (Auth, Theme)
+├── services/             # API services
+│   └── api.ts            # API client and service methods
+└── assets/               # Images, fonts, and other static files
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Authentication Flow
 
-## Learn more
+The app uses JWT token-based authentication:
 
-To learn more about developing your project with Expo, look at the following resources:
+1. User logs in with email/password
+2. Backend returns a JWT token
+3. Token is stored in AsyncStorage
+4. API requests include the token in Authorization header
+5. When token expires, user is redirected to login
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## File Upload Implementation
 
-## Join the community
+File uploads are handled using:
 
-Join our community of developers creating universal apps.
+1. Expo Document Picker to select files
+2. FormData to prepare multipart/form-data requests
+3. Custom headers in API requests to handle file uploads
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Learn More
+
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Native Documentation](https://reactnative.dev/)
+- [Expo Router Documentation](https://docs.expo.dev/router/introduction/)

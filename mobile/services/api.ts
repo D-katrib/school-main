@@ -1,10 +1,11 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// API temel URL'si - backend'in çalıştığı adresi kullanın
-const API_URL = 'http://10.192.32.29:5000/api';
+// API base URL - use the address where your backend is running
+// TODO: Move this to environment variables for different environments
+const API_URL = 'http://192.168.1.14:5000/api';
 
-// Axios instance oluşturma
+// Create Axios instance
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
@@ -13,7 +14,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor - her istekten önce token'ı ekler
+// Request interceptor - adds token to each request
 api.interceptors.request.use(
   async (config) => {
     const token = await AsyncStorage.getItem('authToken');
@@ -23,25 +24,31 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request error interceptor:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor - hata durumlarını yönetir
+// Response interceptor - handles error cases
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // Token geçersiz veya süresi dolmuş
+      // Token is invalid or expired
       await AsyncStorage.removeItem('authToken');
-      // Kullanıcıyı login sayfasına yönlendir
-      // Bu kısım navigation hook'u ile yapılacak
+      // Redirect user to login page
+      // This will be handled by navigation hooks in the components
+      console.log('Authentication token expired or invalid');
     }
+    
+    // Log the error for debugging
+    console.error('API Error:', error.response?.data || error.message);
+    
     return Promise.reject(error);
   }
 );
 
-// Auth servisi
+// Authentication service
 export const authService = {
   login: async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
@@ -56,7 +63,7 @@ export const authService = {
   },
 };
 
-// Kullanıcı servisi
+// User service
 export const userService = {
   getProfile: async () => {
     const response = await api.get('/auth/me');
@@ -68,7 +75,7 @@ export const userService = {
   },
 };
 
-// Kurs servisi
+// Course service
 export const courseService = {
   getAllCourses: async () => {
     const response = await api.get('/courses');
@@ -79,23 +86,88 @@ export const courseService = {
     return response.data;
   },
   enrollCourse: async (courseId: string) => {
-    const response = await api.post(`/courses/${courseId}/enroll`);
+    const response = await api.post(`/courses/${courseId}/enroll-request`);
+    return response.data;
+  },
+  // Methods for course materials
+  getCourseMaterials: async (courseId: string) => {
+    const response = await api.get(`/courses/${courseId}/materials`);
+    return response.data;
+  },
+  addCourseMaterial: async (courseId: string, materialData: FormData) => {
+    const response = await api.post(`/courses/${courseId}/materials`, materialData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  removeCourseMaterial: async (courseId: string, materialId: string) => {
+    const response = await api.delete(`/courses/${courseId}/materials/${materialId}`);
+    return response.data;
+  },
+  // Methods for enrollment requests
+  getEnrollmentRequests: async () => {
+    const response = await api.get('/enrollment-requests');
     return response.data;
   },
 };
 
-// Ödev servisi
+// Assignment service
 export const assignmentService = {
-  getAllAssignments: async () => {
+  /**
+   * Get all assignments
+   * @returns List of assignments
+   */
+  getAssignments: async () => {
     const response = await api.get('/assignments');
-    return response.data;
+    return response;
   },
+
+  /**
+   * Get assignment by ID
+   * @param id Assignment ID
+   * @returns Assignment details
+   */
   getAssignmentById: async (id: string) => {
     const response = await api.get(`/assignments/${id}`);
+    return response;
+  },
+
+  /**
+   * Submit an assignment with optional file attachments
+   * @param assignmentId Assignment ID
+   * @param submissionData Submission data (content and/or files)
+   * @param isFormData Whether the submission includes files (FormData)
+   * @returns Submission response
+   */
+  submitAssignment: async (assignmentId: string, submissionData: any, isFormData: boolean = false) => {
+    const config: any = {};
+    if (isFormData) {
+      config.headers = {
+        'Content-Type': 'multipart/form-data'
+      };
+    }
+    const response = await api.post(`/assignments/${assignmentId}/submit`, submissionData, config);
+    return response;
+  },
+
+  /**
+   * Get submissions for a specific assignment (teacher view)
+   * @param assignmentId Assignment ID
+   * @returns List of submissions
+   */
+  getSubmissions: async (assignmentId: string) => {
+    const response = await api.get(`/assignments/${assignmentId}/submissions`);
     return response.data;
   },
-  submitAssignment: async (assignmentId: string, submissionData: any) => {
-    const response = await api.post(`/assignments/${assignmentId}/submit`, submissionData);
+
+  /**
+   * Get current student's submissions
+   * @returns List of student's submissions
+   */
+  getMySubmissions: async () => {
+    const response = await api.get('/assignments/my-submissions');
     return response.data;
   },
 };

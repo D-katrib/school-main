@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
@@ -43,6 +43,36 @@ const UPCOMING_EVENTS = [
 ];
 
 export default function HomeScreen() {
+  const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // Check API connection on component mount
+  useEffect(() => {
+    checkApiConnection();
+  }, []);
+
+  // Function to check if the API is accessible
+  const checkApiConnection = async () => {
+    try {
+      setApiStatus('checking');
+      setApiError(null);
+      
+      // Try to connect to the API
+      const response = await fetch('http://192.168.1.14:5000/api/courses');
+      
+      if (response.ok) {
+        setApiStatus('connected');
+      } else {
+        setApiStatus('error');
+        setApiError(`API responded with status: ${response.status}`);
+      }
+    } catch (err) {
+      setApiStatus('error');
+      setApiError(`API connection error: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('API connection error:', err);
+    }
+  };
+  
   // Get current time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -66,6 +96,42 @@ export default function HomeScreen() {
       </ThemedView>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* API Connection Status */}
+        <ThemedView style={styles.apiStatusContainer}>
+          <ThemedView style={styles.apiStatusHeader}>
+            <ThemedText type="subtitle">API Connection Status</ThemedText>
+            <TouchableOpacity onPress={checkApiConnection}>
+              <Ionicons name="refresh" size={20} color="#2196F3" />
+            </TouchableOpacity>
+          </ThemedView>
+          
+          <ThemedView style={styles.apiStatusContent}>
+            <Ionicons 
+              name={
+                apiStatus === 'connected' ? 'checkmark-circle' : 
+                apiStatus === 'checking' ? 'time' : 'alert-circle'
+              } 
+              size={24} 
+              color={
+                apiStatus === 'connected' ? '#4CAF50' : 
+                apiStatus === 'checking' ? '#FFC107' : '#F44336'
+              } 
+            />
+            <ThemedText style={styles.apiStatusText}>
+              {
+                apiStatus === 'connected' ? 'Connected to API' : 
+                apiStatus === 'checking' ? 'Checking connection...' : 'Connection Error'
+              }
+            </ThemedText>
+          </ThemedView>
+          
+          {apiError && (
+            <ThemedView style={styles.apiErrorContainer}>
+              <ThemedText style={styles.apiErrorText}>{apiError}</ThemedText>
+            </ThemedView>
+          )}
+        </ThemedView>
+        
         {/* Quick Stats Section */}
         <ThemedView style={styles.statsContainer}>
           {QUICK_STATS.map((stat) => (
@@ -141,6 +207,42 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  apiStatusContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  apiStatusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  apiStatusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  apiStatusText: {
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  apiErrorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  apiErrorText: {
+    color: '#D32F2F',
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',

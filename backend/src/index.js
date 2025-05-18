@@ -44,6 +44,9 @@ app.use(morgan('dev'));
 // Set static folder
 app.use(express.static(path.join(__dirname, '../public')));
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

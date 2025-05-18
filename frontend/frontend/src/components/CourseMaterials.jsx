@@ -93,8 +93,17 @@ const CourseMaterials = ({ courseId }) => {
           return;
         }
         
-        console.log('Adding material with JSON data');
-        await courseService.addCourseMaterial(courseId, newMaterial);
+        // Create a properly formatted material object that matches the database schema
+        const materialData = {
+          title: newMaterial.title,
+          description: newMaterial.description || '',
+          type: newMaterial.type || 'link',
+          url: newMaterial.url,
+          content: newMaterial.content || ''
+        };
+        
+        console.log('Adding material with JSON data:', materialData);
+        await courseService.addCourseMaterial(courseId, materialData);
       }
       
       setShowAddModal(false);

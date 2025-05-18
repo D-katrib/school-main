@@ -135,7 +135,25 @@ exports.deleteAssignment = async (req, res, next) => {
  */
 exports.submitAssignment = async (req, res, next) => {
   try {
-    const submission = await assignmentService.submitAssignment(req.params.id, req.body, req.user);
+    // Handle file uploads if any
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      const uploadService = require('../services/upload.service');
+      attachments = req.files.map(file => ({
+        fileName: file.originalname,
+        fileUrl: uploadService.getFileUrl(req, file.filename, 'assignments'),
+        fileType: file.mimetype,
+        uploadDate: Date.now()
+      }));
+    }
+    
+    // Merge attachments with request body
+    const submissionData = {
+      ...req.body,
+      attachments: attachments.length > 0 ? attachments : req.body.attachments
+    };
+    
+    const submission = await assignmentService.submitAssignment(req.params.id, submissionData, req.user);
     
     res.status(201).json({
       success: true,
