@@ -22,18 +22,10 @@
       ]
     },
     "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
     },
-    "owner": "your-expo-username",
+    "owner": "husseinexpo",
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "updates": {
-      "url": "your-update-url",
-      "enabled": true,
-      "fallbackToCacheTimeout": 0
     },
     "web": {
       "bundler": "metro",
