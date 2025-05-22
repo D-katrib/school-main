@@ -59,27 +59,39 @@ export default function HomeScreen() {
       setApiError(null);
       
       try {
-        // Courses endpoint'ini kontrol edelim
-        const result = await courseService.getAllCourses();
-        console.log('API connection successful:', result);
+        // Check the courses endpoint
+        const coursesData = await courseService.getAllCourses();
+        console.log('API connection successful:', coursesData);
+        // If we get here, the API is connected and returning data correctly
         setApiStatus('connected');
       } catch (error: any) {
         console.log('API connection error details:', error);
         
-        // Eğer 401 hatası alırsak, bu API'nin çalıştığı ama kimlik doğrulama gerektirdiği anlamına gelir
+        // If we get a 401 error, the API is working but requires authentication
         if (error.response && error.response.status === 401) {
           setApiStatus('connected');
           setApiError('API requires authentication. Please log in first.');
+        } else if (error.code === 'ECONNABORTED') {
+          // Request timeout
+          setApiStatus('error');
+          setApiError('Request timed out. The server might be overloaded or the backend service might not be running.');
+        } else if (error.message && error.message.includes('Network Error')) {
+          // Network error - likely server not running or not accessible
+          setApiStatus('error');
+          setApiError(`Network Error: Cannot connect to the server. Please check if:
+1. The backend server is running
+2. You are using the correct server address in the API configuration
+3. Your device has network connectivity`);
         } else if (error.response) {
-          // Başka bir HTTP hatası
+          // Other HTTP error
           setApiStatus('error');
-          setApiError(`API responded with status: ${error.response.status}`);
+          setApiError(`API responded with status: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`);
         } else if (error.request) {
-          // İstek yapıldı ama yanıt alınamadı
+          // Request was made but no response received
           setApiStatus('error');
-          setApiError('API server is unreachable. Check your network connection or server address.');
+          setApiError('API server is unreachable. The server might not be running or the address might be incorrect.');
         } else {
-          // İstek oluşturulurken bir hata oluştu
+          // Error in setting up the request
           setApiStatus('error');
           setApiError(`API connection error: ${error.message || 'Unknown error'}`);
         }

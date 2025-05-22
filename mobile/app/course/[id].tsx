@@ -73,9 +73,16 @@ export default function CourseDetailScreen() {
     
     try {
       setLoading(true);
-      const response = await courseService.getCourseById(id as string);
-      setCourse(response.data);
-      fetchMaterials();
+      const courseData = await courseService.getCourseById(id as string);
+      console.log('Course data received:', courseData);
+      
+      if (courseData) {
+        setCourse(courseData);
+        fetchMaterials();
+      } else {
+        console.error('Unexpected course data format:', courseData);
+        setError('Failed to load course details. Unexpected data format.');
+      }
     } catch (error) {
       console.error('Error fetching course:', error);
       setError('Failed to load course details');
@@ -89,8 +96,14 @@ export default function CourseDetailScreen() {
     
     try {
       setMaterialsLoading(true);
-      const response = await courseService.getCourseMaterials(id as string);
-      setMaterials(response.data);
+      const materialsData = await courseService.getCourseMaterials(id as string);
+      console.log('Materials data received:', materialsData);
+      
+      if (Array.isArray(materialsData)) {
+        setMaterials(materialsData);
+      } else {
+        console.error('Unexpected materials data format:', materialsData);
+      }
     } catch (error) {
       console.error('Error fetching materials:', error);
     } finally {

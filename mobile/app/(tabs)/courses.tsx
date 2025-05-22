@@ -32,11 +32,13 @@ export default function CoursesScreen() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await courseService.getAllCourses();
-      if (response.data && Array.isArray(response.data.data)) {
-        setCourses(response.data.data);
+      const coursesData = await courseService.getAllCourses();
+      console.log('Courses data received:', coursesData);
+      
+      if (Array.isArray(coursesData)) {
+        setCourses(coursesData);
       } else {
-        console.error('Unexpected API response format:', response);
+        console.error('Unexpected API response format:', coursesData);
         Alert.alert('Error', 'Failed to load courses. Unexpected data format.');
       }
     } catch (error) {

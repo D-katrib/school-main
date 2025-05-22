@@ -91,6 +91,37 @@ File uploads are handled using:
 2. FormData to prepare multipart/form-data requests
 3. Custom headers in API requests to handle file uploads
 
+## Troubleshooting
+
+### Expo Go Compatibility
+
+This project uses Expo SDK 49.0.0, which requires a compatible version of Expo Go. If you see an error like:
+
+```
+ERROR  Project is incompatible with this version of Expo Go
+```
+
+You have two options:
+
+1. **Install the correct Expo Go version**: Download Expo Go version compatible with SDK 49
+   - For Android: [Expo Go Archive](https://github.com/expo/expo/releases?q=sdk-49&expanded=true)
+   - For iOS: Use TestFlight to install an older version if available
+
+2. **Update the project to match your Expo Go**: Update the project to use SDK 53 (requires code changes)
+
+### API Connection Issues
+
+If you encounter API connection errors:
+
+1. **Check the API URL**: Make sure the API_URL in `services/api.ts` is set to your computer's actual IP address
+   - For Android Emulator: `http://10.0.2.2:5000/api`
+   - For iOS Simulator: `http://localhost:5000/api`
+   - For physical device: `http://YOUR_COMPUTER_IP:5000/api` (use `ipconfig` to find your IP)
+
+2. **Verify backend server**: Ensure the backend server is running on port 5000
+
+3. **Network connectivity**: Make sure your device and computer are on the same network
+
 ## Learn More
 
 - [Expo Documentation](https://docs.expo.dev/)

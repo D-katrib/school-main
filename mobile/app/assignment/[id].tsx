@@ -79,10 +79,14 @@ export default function AssignmentDetailScreen() {
     
     try {
       setLoading(true);
-      const response = await assignmentService.getAssignmentById(id as string);
-      if (response.data && response.data.data) {
-        setAssignment(response.data.data);
+      console.log('Fetching assignment with ID:', id);
+      const assignmentData = await assignmentService.getAssignmentById(id as string);
+      console.log('Assignment data received:', assignmentData);
+      
+      if (assignmentData) {
+        setAssignment(assignmentData);
       } else {
+        console.error('No assignment data returned from API');
         setError('Failed to load assignment details');
       }
     } catch (error) {
@@ -163,12 +167,14 @@ export default function AssignmentDetailScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
     const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  const isPastDue = (dueDate: string) => {
+  const isPastDue = (dueDate: string | undefined) => {
+    if (!dueDate) return false;
     return new Date(dueDate) < new Date();
   };
 
@@ -184,27 +190,170 @@ export default function AssignmentDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ThemedView style={styles.loadingContainer}>
-          <ActivityIndicator size="large" />
-          <ThemedText style={{ marginTop: 16 }}>Loading assignment details...</ThemedText>
-        </ThemedView>
-      </SafeAreaView>
-    );
-  }
-
-  if (error || !assignment) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ThemedView style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
-          <ThemedText style={{ marginTop: 16 }}>{error || 'Assignment not found'}</ThemedText>
-          <TouchableOpacity 
-            style={styles.button} 
+        <ThemedView style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ThemedText style={styles.buttonText}>Go Back</ThemedText>
+            <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </TouchableOpacity>
+
+          {loading ? (
+            <ActivityIndicator size="small" />
+          ) : assignment ? (
+            <ThemedText type="title">{assignment.title}</ThemedText>
+          ) : (
+            <ThemedText type="title">Assignment Details</ThemedText>
+          )}
         </ThemedView>
+
+        {loading ? (
+          <ThemedView style={styles.loadingContainer}>
+            <ActivityIndicator size="large" />
+            <ThemedText style={{ marginTop: 16 }}>Loading assignment details...</ThemedText>
+          </ThemedView>
+        ) : error ? (
+          <ThemedView style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
+            <ThemedText style={{ marginTop: 16 }}>{error}</ThemedText>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={fetchAssignment}
+            >
+              <ThemedText style={styles.buttonText}>Retry</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        ) : assignment ? (
+          <ScrollView>
+            {/* Assignment Title and Course */}
+            <ThemedView style={styles.section}>
+              <ThemedText type="subtitle">{assignment.title}</ThemedText>
+              <ThemedView style={styles.courseContainer}>
+                <Ionicons name="book-outline" size={18} color="#666" />
+                <ThemedText style={styles.courseText}>
+                  {assignment.course?.name} ({assignment.course?.code})
+                </ThemedText>
+              </ThemedView>
+            </ThemedView>
+            
+            {/* Assignment Description */}
+            <ThemedView style={styles.section}>
+              <ThemedText type="subtitle">Description</ThemedText>
+              <ThemedText style={styles.description}>
+                {assignment.description || 'No description provided.'}
+              </ThemedText>
+            </ThemedView>
+
+            {/* Assignment Details */}
+            <ThemedView style={styles.section}>
+              <ThemedText type="subtitle">Details</ThemedText>
+              
+              <ThemedView style={styles.infoRow}>
+                <ThemedText style={styles.infoLabel}>Due Date:</ThemedText>
+                <ThemedText style={isPastDue(assignment.dueDate) ? styles.pastDue : styles.upcoming}>
+                  {formatDate(assignment.dueDate)}
+                  {isPastDue(assignment.dueDate) ? ' (Past Due)' : ''}
+                </ThemedText>
+              </ThemedView>
+
+              <ThemedView style={styles.infoRow}>
+                <ThemedText style={styles.infoLabel}>Points:</ThemedText>
+                <ThemedText>{assignment.totalPoints}</ThemedText>
+              </ThemedView>
+
+              <ThemedView style={styles.infoRow}>
+                <ThemedText style={styles.infoLabel}>Created By:</ThemedText>
+                <ThemedText>
+                  {assignment.createdBy ? 
+                    `${assignment.createdBy.firstName} ${assignment.createdBy.lastName}` : 
+                    'Unknown'}
+                </ThemedText>
+              </ThemedView>
+              
+              <ThemedView style={styles.infoRow}>
+                <ThemedText style={styles.infoLabel}>Created On:</ThemedText>
+                <ThemedText>{formatDate(assignment.createdAt)}</ThemedText>
+              </ThemedView>
+            </ThemedView>
+
+            {/* Assignment Attachments */}
+            {assignment.attachments && assignment.attachments.length > 0 ? (
+              <ThemedView style={styles.section}>
+                <ThemedText type="subtitle">Attachments</ThemedText>
+                {assignment.attachments.map((attachment, index) => (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={styles.attachmentItem}
+                    onPress={() => openAttachment(attachment)}
+                  >
+                    <Ionicons name="document-outline" size={24} color="#666" />
+                    <ThemedText style={styles.attachmentName}>{attachment.fileName}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </ThemedView>
+            ) : (
+              <ThemedView style={styles.section}>
+                <ThemedText type="subtitle">Attachments</ThemedText>
+                <ThemedText style={styles.noItemsText}>No attachments for this assignment</ThemedText>
+              </ThemedView>
+            )}
+
+            {/* Submit Your Work Section */}
+            <ThemedView style={styles.section}>
+              <ThemedText type="subtitle">Submit Your Work</ThemedText>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type your answer here..."
+                multiline
+                value={submission}
+                onChangeText={setSubmission}
+                editable={!submitting}
+              />
+              <TouchableOpacity 
+                style={styles.fileButton}
+                onPress={handlePickDocument}
+                disabled={submitting}
+              >
+                <Ionicons name="document-attach" size={20} color="#fff" />
+                <ThemedText style={styles.fileButtonText}>Select Files</ThemedText>
+              </TouchableOpacity>
+
+              {selectedFiles.length > 0 && (
+                <ThemedView style={styles.selectedFiles}>
+                  <ThemedText style={styles.selectedFilesTitle}>Selected Files:</ThemedText>
+                  {selectedFiles.map((file, index) => (
+                    <ThemedView key={index} style={styles.selectedFileItem}>
+                      <Ionicons name="document" size={16} color="#666" />
+                      <ThemedText style={styles.selectedFileName}>{file.name}</ThemedText>
+                    </ThemedView>
+                  ))}
+                </ThemedView>
+              )}
+              <TouchableOpacity 
+                style={[styles.submitButton, (submitting || (!submission.trim() && selectedFiles.length === 0)) && styles.disabledButton]}
+                onPress={handleSubmit}
+                disabled={submitting || (!submission.trim() && selectedFiles.length === 0)}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.submitButtonText}>Submit Assignment</ThemedText>
+                )}
+              </TouchableOpacity>
+            </ThemedView>
+          </ScrollView>
+        ) : (
+          <ThemedView style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
+            <ThemedText style={{ marginTop: 16 }}>Assignment not found</ThemedText>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => router.back()}
+            >
+              <ThemedText style={styles.buttonText}>Go Back</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        )}
       </SafeAreaView>
     );
   }
@@ -216,19 +365,19 @@ export default function AssignmentDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <ThemedText type="title">{assignment.title}</ThemedText>
-          <ThemedText>{assignment.course.name} ({assignment.course.code})</ThemedText>
+          <ThemedText type="title">{assignment?.title}</ThemedText>
+          <ThemedText>{assignment?.course?.name} ({assignment?.course?.code})</ThemedText>
         </ThemedView>
 
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle">Description</ThemedText>
-          <ThemedText style={styles.description}>{assignment.description}</ThemedText>
+          <ThemedText style={styles.description}>{assignment?.description}</ThemedText>
         </ThemedView>
 
-        {assignment.attachments && assignment.attachments.length > 0 && (
+        {assignment?.attachments && assignment?.attachments.length > 0 && (
           <ThemedView style={styles.section}>
             <ThemedText type="subtitle">Attachments</ThemedText>
-            {assignment.attachments.map((attachment, index) => (
+            {assignment?.attachments.map((attachment, index) => (
               <TouchableOpacity 
                 key={attachment._id || index} 
                 style={styles.attachmentItem}
@@ -245,18 +394,18 @@ export default function AssignmentDetailScreen() {
           <ThemedText type="subtitle">Assignment Details</ThemedText>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.infoLabel}>Due Date:</ThemedText>
-            <ThemedText style={isPastDue(assignment.dueDate) ? styles.pastDue : styles.upcoming}>
-              {formatDate(assignment.dueDate)}
-              {isPastDue(assignment.dueDate) ? ' (Past Due)' : ''}
+            <ThemedText style={isPastDue(assignment?.dueDate) ? styles.pastDue : styles.upcoming}>
+              {formatDate(assignment?.dueDate)}
+              {isPastDue(assignment?.dueDate) ? ' (Past Due)' : ''}
             </ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.infoLabel}>Points:</ThemedText>
-            <ThemedText>{assignment.totalPoints}</ThemedText>
+            <ThemedText>{assignment?.totalPoints}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.infoLabel}>Created By:</ThemedText>
-            <ThemedText>{`${assignment.createdBy.firstName} ${assignment.createdBy.lastName}`}</ThemedText>
+            <ThemedText>{`${assignment?.createdBy?.firstName} ${assignment?.createdBy?.lastName}`}</ThemedText>
           </ThemedView>
         </ThemedView>
 
@@ -349,6 +498,20 @@ const styles = StyleSheet.create({
   upcoming: {
     color: '#4caf50',
   },
+  courseContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  courseText: {
+    marginLeft: 8,
+    color: '#666',
+  },
+  noItemsText: {
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
   attachmentItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -440,5 +603,9 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  sectionTitle: {
+    fontWeight: 'bold',
+    fontSize: 18,
   },
 });
