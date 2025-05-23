@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
@@ -7,8 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { courseService } from '@/services/api';
+import { courseService, userService } from '@/services/api';
 import * as FileSystem from 'expo-file-system';
+import CourseForm from '@/components/CourseForm';
 
 // Course type definition
 interface Teacher {
@@ -63,10 +64,24 @@ export default function CourseDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [materialsLoading, setMaterialsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [userRole, setUserRole] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
+    fetchUserProfile();
     fetchCourse();
   }, [id]);
+  
+  const fetchUserProfile = async () => {
+    try {
+      const userData = await userService.getProfile();
+      setUserRole(userData.role);
+      setUserId(userData._id);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   const fetchCourse = async () => {
     if (!id) return;
@@ -184,7 +199,70 @@ export default function CourseDetailScreen() {
   };
 
   const formatSchedule = (schedule: Schedule) => {
-    return `${schedule.day} ${schedule.startTime}-${schedule.endTime} (Room: ${schedule.room})`;
+    return `${schedule.day}, ${schedule.startTime} - ${schedule.endTime}, Room ${schedule.room}`;
+  };
+
+  const handleUpdateCourse = async (courseData: { 
+    name: string; 
+    code: string; 
+    description: string;
+    grade: string;
+    academicYear: string;
+    semester: string;
+    syllabusUrl: string;
+    schedule: { day: string; startTime: string; endTime: string; room: string }[];
+  }) => {
+    if (!course) return;
+    
+    try {
+      setLoading(true);
+      await courseService.updateCourse(course._id, courseData);
+      setModalVisible(false);
+      fetchCourse();
+      Alert.alert('Success', 'Course updated successfully');
+    } catch (error: any) {
+      console.error('Error updating course:', error);
+      Alert.alert('Error', 'Failed to update course');
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = () => {
+    if (!course) return;
+
+    Alert.alert(
+      'Delete Course',
+      `Are you sure you want to delete ${course.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await courseService.deleteCourse(course._id);
+              Alert.alert('Success', 'Course deleted successfully');
+              router.replace('/(tabs)/courses');
+            } catch (error: any) {
+              console.error('Error deleting course:', error);
+              
+              // Check if it's a permission error
+              if (error.response && error.response.status === 403) {
+                Alert.alert(
+                  'Permission Denied',
+                  'You can only delete courses that you teach. This course is taught by another teacher.'
+                );
+              } else {
+                Alert.alert('Error', 'Failed to delete course');
+              }
+              
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) {
@@ -215,13 +293,48 @@ export default function CourseDetailScreen() {
     );
   }
 
+  // Check if the user is allowed to edit/delete this course
+  const isTeacherOfCourse = () => {
+    // Admin can edit/delete any course
+    if (userRole === 'admin') {
+      return true;
+    }
+    
+    // Teachers can only edit/delete their own courses
+    if (userRole === 'teacher' && course.teacher && course.teacher._id === userId) {
+      return true;
+    }
+    
+    // Students and other roles cannot edit/delete courses
+    return false;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <ThemedView style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        {isTeacherOfCourse() && (
+          <ThemedView style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => setModalVisible(true)}
+            >
+              <Ionicons name="pencil" size={24} color="#2196F3" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleDeleteCourse}
+            >
+              <Ionicons name="trash" size={24} color="#F44336" />
+            </TouchableOpacity>
+          </ThemedView>
+        )}
+      </ThemedView>
+      
       <ScrollView>
-        <ThemedView style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
+        <ThemedView style={styles.courseHeader}>
           <ThemedText type="title">{course.name}</ThemedText>
           <ThemedText>{course.code}</ThemedText>
         </ThemedView>
@@ -258,12 +371,14 @@ export default function CourseDetailScreen() {
         <ThemedView style={styles.section}>
           <ThemedView style={styles.sectionHeader}>
             <ThemedText type="subtitle">Course Materials</ThemedText>
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={handleAddMaterial}
-            >
-              <Ionicons name="add" size={24} color="#fff" />
-            </TouchableOpacity>
+            {(userRole === 'teacher' || userRole === 'admin') && (
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={handleAddMaterial}
+              >
+                <Ionicons name="add" size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
           </ThemedView>
 
           {materialsLoading ? (
@@ -324,6 +439,28 @@ export default function CourseDetailScreen() {
           )}
         </ThemedView>
       </ScrollView>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <CourseForm
+          initialValues={{
+            name: course.name,
+            code: course.code,
+            description: course.description || '',
+            grade: course.grade?.toString() || '',
+            academicYear: course.academicYear || '',
+            semester: course.semester || 'Fall',
+            syllabusUrl: course.syllabus || '',
+            schedule: course.schedule || []
+          }}
+          onSubmit={handleUpdateCourse}
+          onCancel={() => setModalVisible(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -336,9 +473,24 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   backButton: {
-    marginBottom: 8,
+    marginBottom: 0,
+  },
+  courseHeader: {
+    padding: 16,
+    backgroundColor: '#f5f5f5',
   },
   section: {
     padding: 16,

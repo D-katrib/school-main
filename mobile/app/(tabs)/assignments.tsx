@@ -5,7 +5,7 @@ import { ThemedView } from '../../components/ThemedView';
 import { ThemedText } from '../../components/ThemedText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { assignmentService } from '../../services/api';
+import { assignmentService, userService } from '../../services/api';
 
 // Assignment type definitions
 interface Course {
@@ -37,11 +37,24 @@ export default function AssignmentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [userRole, setUserRole] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   // Fetch assignments when the component mounts
   useEffect(() => {
+    fetchUserProfile();
     fetchAssignments();
   }, []);
+  
+  const fetchUserProfile = async () => {
+    try {
+      const userData = await userService.getProfile();
+      setUserRole(userData.role);
+      setUserId(userData._id);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
   
   // Refresh assignments when the screen comes into focus
   useFocusEffect(
@@ -120,13 +133,15 @@ export default function AssignmentsScreen() {
         <Ionicons name="chevron-forward" size={24} color="#888" />
       </TouchableOpacity>
       
-      {/* Delete button */}
-      <TouchableOpacity 
-        style={styles.deleteButton}
-        onPress={() => handleDeleteAssignment(item._id)}
-      >
-        <Ionicons name="trash-outline" size={22} color="#fff" />
-      </TouchableOpacity>
+      {/* Delete button - only visible for teachers and admins */}
+      {(userRole === 'teacher' || userRole === 'admin') && (
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={() => handleDeleteAssignment(item._id)}
+        >
+          <Ionicons name="trash-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
     </ThemedView>
   );
 
@@ -171,12 +186,14 @@ export default function AssignmentsScreen() {
     <SafeAreaView style={styles.container}>
       <ThemedView style={styles.header}>
         <ThemedText type="title">Assignments</ThemedText>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={handleAddAssignment}
-        >
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        {(userRole === 'teacher' || userRole === 'admin') && (
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={handleAddAssignment}
+          >
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
       </ThemedView>
 
       {loading ? (

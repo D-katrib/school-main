@@ -109,6 +109,13 @@ export const userService = {
     const response = await api.put('/users/profile', userData);
     return response.data;
   },
+  getAllTeachers: async () => {
+    const response = await api.get('/users?role=teacher');
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return response.data;
+  },
 };
 
 // Course service
@@ -137,6 +144,27 @@ export const courseService = {
   enrollCourse: async (courseId: string) => {
     const response = await api.post(`/courses/${courseId}/enroll-request`);
     // Handle response format consistently
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return response.data;
+  },
+  createCourse: async (courseData: any) => {
+    const response = await api.post('/courses', courseData);
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return response.data;
+  },
+  updateCourse: async (id: string, courseData: any) => {
+    const response = await api.put(`/courses/${id}`, courseData);
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return response.data;
+  },
+  deleteCourse: async (id: string) => {
+    const response = await api.delete(`/courses/${id}`);
     if (response.data && response.data.data) {
       return response.data.data;
     }

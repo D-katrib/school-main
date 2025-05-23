@@ -269,7 +269,7 @@ router.put('/:id', authorize('admin', 'teacher'), updateCourse);
  *       404:
  *         description: Course not found
  */
-router.delete('/:id', authorize('admin'), deleteCourse);
+router.delete('/:id', authorize('admin', 'teacher'), deleteCourse);
 
 /**
  * @swagger
