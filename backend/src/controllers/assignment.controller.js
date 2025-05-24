@@ -1,4 +1,6 @@
 const assignmentService = require('../services/assignment.service');
+const Assignment = require('../models/assignment.model');
+const Submission = require('../models/submission.model');
 
 /**
  * @desc    Get all assignments
@@ -135,25 +137,63 @@ exports.deleteAssignment = async (req, res, next) => {
  */
 exports.submitAssignment = async (req, res, next) => {
   try {
-    // Handle file uploads if any
+    // Check if user is a student
+    if (req.user.role !== 'student') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only students can submit assignments'
+      });
+    }
+    
+    console.log(`Processing assignment submission for assignment ${req.params.id} by student ${req.user.id}`);
+    
+    // Process file uploads if any
     let attachments = [];
+    
     if (req.files && req.files.length > 0) {
-      const uploadService = require('../services/upload.service');
+      console.log(`Processing ${req.files.length} uploaded files`);
       attachments = req.files.map(file => ({
         fileName: file.originalname,
-        fileUrl: uploadService.getFileUrl(req, file.filename, 'assignments'),
-        fileType: file.mimetype,
-        uploadDate: Date.now()
+        fileUrl: file.path,
+        fileType: file.mimetype
       }));
     }
     
-    // Merge attachments with request body
+    // Create submission data
     const submissionData = {
-      ...req.body,
-      attachments: attachments.length > 0 ? attachments : req.body.attachments
+      content: req.body.content,
+      attachments
     };
     
-    const submission = await assignmentService.submitAssignment(req.params.id, submissionData, req.user);
+    // Check if student has already submitted this assignment
+    const existingSubmission = await Submission.findOne({
+      assignment: req.params.id,
+      student: req.user.id
+    });
+    
+    if (existingSubmission) {
+      console.log(`Student ${req.user.id} has already submitted assignment ${req.params.id}`);
+      console.log(`Existing submission ID: ${existingSubmission._id}`);
+    }
+    
+    // Submit assignment
+    const submission = await assignmentService.submitAssignment(
+      req.params.id,
+      submissionData,
+      req.user
+    );
+    
+    console.log(`Submission successful. Submission ID: ${submission._id}`);
+    
+    // Update assignment with submission ID if it's a new submission
+    if (!existingSubmission) {
+      console.log(`Updating assignment ${req.params.id} with new submission ID ${submission._id}`);
+      await Assignment.findByIdAndUpdate(
+        req.params.id,
+        { $addToSet: { submissionIds: submission._id } },
+        { new: true }
+      );
+    }
     
     res.status(201).json({
       success: true,

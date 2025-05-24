@@ -160,9 +160,12 @@ const AssignmentDetail = () => {
   const isTeacher = currentUser?.role === 'teacher';
   const isStudent = currentUser?.role === 'student';
   
+  // Check if student has already submitted this assignment
+  const hasSubmitted = !!assignment.submission;
+  
   // Always allow admin to edit/delete, allow teacher if they teach the course
   const canEdit = isAdmin || (isTeacher && currentUser?._id);
-  const canSubmit = isStudent && !isPastDue(assignment.dueDate) && !assignment.submitted;
+  const canSubmit = isStudent && !isPastDue(assignment.dueDate) && !hasSubmitted;
 
   return (
     <div className="container-fluid py-4 page-transition">
@@ -223,10 +226,10 @@ const AssignmentDetail = () => {
               {isStudent && (
                 <div className="mt-4">
                   <h2 className="fs-4 fw-semibold mb-3">Submit Assignment</h2>
-                  {assignment.submitted ? (
+                  {hasSubmitted ? (
                     <div className="alert alert-success">
                       <p className="fw-medium mb-1">You have already submitted this assignment.</p>
-                      <p className="mb-0">Submitted on: {formatDate(assignment.submittedAt)}</p>
+                      <p className="mb-0">Submitted on: {formatDate(assignment.submission.submittedAt)}</p>
                     </div>
                   ) : isPastDue(assignment.dueDate) ? (
                     <div className="alert alert-danger">

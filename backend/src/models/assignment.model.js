@@ -73,7 +73,11 @@ const AssignmentSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  submissionIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Submission'
+  }]
 }, {
   toJSON: { virtuals: true },
   toObject: { virtuals: true }

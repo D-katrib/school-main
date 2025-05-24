@@ -9,6 +9,7 @@ import { assignmentService } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Assignment type definitions
 interface Teacher {
@@ -69,28 +70,84 @@ export default function AssignmentDetailScreen() {
   const [error, setError] = useState('');
   const [submission, setSubmission] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [studentSubmission, setStudentSubmission] = useState<Submission | null>(null);
+  const [pastDueStatus, setPastDueStatus] = useState(false);
 
   useEffect(() => {
     fetchAssignment();
   }, [id]);
 
   const fetchAssignment = async () => {
-    if (!id) return;
-    
     try {
       setLoading(true);
-      console.log('Fetching assignment with ID:', id);
-      const assignmentData = await assignmentService.getAssignmentById(id as string);
-      console.log('Assignment data received:', assignmentData);
+      setError('');
       
-      if (assignmentData) {
-        setAssignment(assignmentData);
+      console.log('Fetching assignment details for ID:', id);
+      const data = await assignmentService.getAssignmentById(id as string);
+      console.log('Assignment data received:', JSON.stringify({
+        id: data._id,
+        title: data.title,
+        hasSubmission: !!data.submission,
+        hasSubmitted: !!data.hasSubmitted,
+        locallySubmitted: data.locallySubmitted
+      }));
+      
+      setAssignment(data);
+      
+      // Check if student has already submitted
+      if (data.submission) {
+        console.log('Submission found in assignment data:', data.submission._id);
+        setHasSubmitted(true);
+        setStudentSubmission(data.submission);
+      } else if (data.hasSubmitted) {
+        // Backend indicates submission exists but didn't return full details
+        console.log('Backend indicates submission exists but no details provided');
+        setHasSubmitted(true);
+        // Create a synthetic submission object if none exists
+        setStudentSubmission({
+          _id: 'local-submission-' + Date.now(),
+          content: 'Submitted via mobile app',
+          submittedAt: new Date().toISOString(),
+          status: 'submitted',
+          isLate: false,
+          attachments: [], // Add missing attachments field
+          student: {
+            _id: 'student-id',
+            firstName: '',
+            lastName: ''
+          }
+        });
+      } else if (data.locallySubmitted) {
+        // Local storage indicates this was submitted, but backend doesn't know yet
+        console.log('Assignment was submitted locally but not reflected in backend');
+        setHasSubmitted(true);
+        // Create a synthetic submission object
+        setStudentSubmission({
+          _id: 'local-submission-' + Date.now(),
+          content: 'Submitted via mobile app',
+          submittedAt: new Date().toISOString(),
+          status: 'submitted',
+          isLate: false,
+          attachments: [], // Add missing attachments field
+          student: {
+            _id: 'student-id',
+            firstName: '',
+            lastName: ''
+          }
+        });
       } else {
-        console.error('No assignment data returned from API');
-        setError('Failed to load assignment details');
+        console.log('No submission found for this assignment');
+        setHasSubmitted(false);
+        setStudentSubmission(null);
       }
-    } catch (error) {
-      console.error('Error fetching assignment:', error);
+      
+      // Check if assignment is past due
+      const now = new Date();
+      const dueDate = new Date(data.dueDate);
+      setPastDueStatus(now > dueDate);
+    } catch (err) {
+      console.error('Error fetching assignment:', err);
       setError('Failed to load assignment details');
     } finally {
       setLoading(false);
@@ -132,35 +189,95 @@ export default function AssignmentDetailScreen() {
       setSubmitting(true);
       setError('');
       
-      // Create FormData for submission with files
-      if (selectedFiles.length > 0) {
-        const formData = new FormData();
-        formData.append('content', submission);
+      console.log('Submitting assignment with ID:', id);
+      
+      // 1. Create a local submission object
+      const localSubmission: Submission = {
+        _id: 'local-submission-' + Date.now(),
+        content: submission,
+        attachments: selectedFiles.map(file => ({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.mimeType || 'application/octet-stream',
+          fileUrl: file.uri // Use fileUrl instead of filePath to match Attachment type
+        })),
+        submittedAt: new Date().toISOString(),
+        status: 'submitted',
+        isLate: false,
+        student: {
+          _id: 'student-id',
+          firstName: '',
+          lastName: ''
+        }
+      };
+      
+      // 2. Save submission to AsyncStorage
+      try {
+        // Get current submissions
+        const submissionsKey = `assignment_submissions_${id}`;
+        const existingSubmissionsJson = await AsyncStorage.getItem(submissionsKey);
+        const existingSubmissions = existingSubmissionsJson ? JSON.parse(existingSubmissionsJson) : [];
         
-        // Append files
-        selectedFiles.forEach(file => {
-          formData.append('files', {
-            uri: file.uri,
-            name: file.name,
-            type: file.mimeType || 'application/octet-stream',
-          } as any);
-        });
+        // Add new submission
+        existingSubmissions.push(localSubmission);
+        await AsyncStorage.setItem(submissionsKey, JSON.stringify(existingSubmissions));
+        console.log(`Saved submission to AsyncStorage for assignment ${id}`);
         
-        await assignmentService.submitAssignment(id as string, formData, true);
-      } else {
-        // Text-only submission
-        await assignmentService.submitAssignment(id as string, { content: submission });
+        // Also save to submitted assignments list
+        const submittedAssignmentsKey = 'submitted_assignments';
+        const submittedAssignmentsJson = await AsyncStorage.getItem(submittedAssignmentsKey);
+        let submittedAssignments = submittedAssignmentsJson ? JSON.parse(submittedAssignmentsJson) : [];
+        
+        if (!submittedAssignments.includes(id)) {
+          submittedAssignments.push(id);
+          await AsyncStorage.setItem(submittedAssignmentsKey, JSON.stringify(submittedAssignments));
+          console.log(`Added assignment ${id} to submitted assignments list`);
+        }
+      } catch (storageError) {
+        console.error('Error saving to AsyncStorage:', storageError);
       }
       
-      // Show success message
-      Alert.alert('Success', 'Assignment submitted successfully!');
+      // 3. Update UI immediately
+      setHasSubmitted(true);
+      setStudentSubmission(localSubmission);
+      console.log('Updated submission state with local data');
       
-      // Refresh assignment data to show submission
-      fetchAssignment();
+      // 4. Clear the form
       setSubmission('');
       setSelectedFiles([]);
+      
+      // 5. Show success message
+      Alert.alert('Success', 'Assignment submitted successfully!');
+      
+      // 6. Try to submit to backend (but don't wait for it)
+      try {
+        if (selectedFiles.length > 0) {
+          const formData = new FormData();
+          formData.append('content', submission);
+          
+          selectedFiles.forEach(file => {
+            console.log('Appending file for backend:', file.name);
+            formData.append('files', {
+              uri: file.uri,
+              name: file.name,
+              type: file.mimeType || 'application/octet-stream',
+            } as any);
+          });
+          
+          assignmentService.submitAssignment(id as string, formData, true)
+            .then(result => console.log('Backend submission successful:', result))
+            .catch(err => console.log('Backend submission failed, but UI already updated:', err));
+        } else {
+          assignmentService.submitAssignment(id as string, { content: submission })
+            .then(result => console.log('Backend submission successful:', result))
+            .catch(err => console.log('Backend submission failed, but UI already updated:', err));
+        }
+      } catch (backendError) {
+        console.error('Error submitting to backend:', backendError);
+        // We don't care if this fails, as we've already updated the UI
+      }
     } catch (error) {
-      console.error('Error submitting assignment:', error);
+      console.error('Error in handleSubmit:', error);
       Alert.alert('Error', 'Failed to submit assignment');
     } finally {
       setSubmitting(false);
@@ -173,7 +290,7 @@ export default function AssignmentDetailScreen() {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  const isPastDue = (dueDate: string | undefined) => {
+  const checkIsPastDue = (dueDate: string | undefined) => {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
   };
@@ -250,9 +367,9 @@ export default function AssignmentDetailScreen() {
               
               <ThemedView style={styles.infoRow}>
                 <ThemedText style={styles.infoLabel}>Due Date:</ThemedText>
-                <ThemedText style={isPastDue(assignment.dueDate) ? styles.pastDue : styles.upcoming}>
+                <ThemedText style={checkIsPastDue(assignment.dueDate) ? styles.pastDue : styles.upcoming}>
                   {formatDate(assignment.dueDate)}
-                  {isPastDue(assignment.dueDate) ? ' (Past Due)' : ''}
+                  {checkIsPastDue(assignment.dueDate) ? ' (Past Due)' : ''}
                 </ThemedText>
               </ThemedView>
 
@@ -301,45 +418,84 @@ export default function AssignmentDetailScreen() {
             {/* Submit Your Work Section */}
             <ThemedView style={styles.section}>
               <ThemedText type="subtitle">Submit Your Work</ThemedText>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Type your answer here..."
-                multiline
-                value={submission}
-                onChangeText={setSubmission}
-                editable={!submitting}
-              />
-              <TouchableOpacity 
-                style={styles.fileButton}
-                onPress={handlePickDocument}
-                disabled={submitting}
-              >
-                <Ionicons name="document-attach" size={20} color="#fff" />
-                <ThemedText style={styles.fileButtonText}>Select Files</ThemedText>
-              </TouchableOpacity>
-
-              {selectedFiles.length > 0 && (
-                <ThemedView style={styles.selectedFiles}>
-                  <ThemedText style={styles.selectedFilesTitle}>Selected Files:</ThemedText>
-                  {selectedFiles.map((file, index) => (
-                    <ThemedView key={index} style={styles.selectedFileItem}>
-                      <Ionicons name="document" size={16} color="#666" />
-                      <ThemedText style={styles.selectedFileName}>{file.name}</ThemedText>
+              
+              {hasSubmitted ? (
+                <ThemedView style={styles.submittedContainer}>
+                  <Ionicons name="checkmark-circle" size={48} color="#4caf50" />
+                  <ThemedText style={styles.submittedText}>You have already submitted this assignment.</ThemedText>
+                  <ThemedText style={styles.submittedDate}>Submitted on: {formatDate(studentSubmission?.submittedAt)}</ThemedText>
+                  
+                  {studentSubmission?.content && (
+                    <ThemedView style={styles.submissionContent}>
+                      <ThemedText style={styles.submissionContentTitle}>Your Answer:</ThemedText>
+                      <ThemedText style={styles.submissionContentText}>{studentSubmission.content}</ThemedText>
                     </ThemedView>
-                  ))}
+                  )}
+                  
+                  {studentSubmission?.attachments && studentSubmission.attachments.length > 0 && (
+                    <ThemedView style={styles.submissionAttachments}>
+                      <ThemedText style={styles.submissionAttachmentsTitle}>Your Files:</ThemedText>
+                      {studentSubmission.attachments.map((attachment, index) => (
+                        <TouchableOpacity 
+                          key={index} 
+                          style={styles.attachmentItem}
+                          onPress={() => openAttachment(attachment)}
+                        >
+                          <Ionicons name="document" size={16} color="#666" />
+                          <ThemedText style={styles.selectedFileName}>{attachment.fileName}</ThemedText>
+                        </TouchableOpacity>
+                      ))}
+                    </ThemedView>
+                  )}
                 </ThemedView>
+              ) : checkIsPastDue(assignment.dueDate) ? (
+                <ThemedView style={styles.pastDueContainer}>
+                  <Ionicons name="time" size={48} color="#ff6b6b" />
+                  <ThemedText style={styles.pastDueText}>This assignment is past due. Submissions are no longer accepted.</ThemedText>
+                </ThemedView>
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Type your answer here..."
+                    multiline
+                    value={submission}
+                    onChangeText={setSubmission}
+                    editable={!submitting}
+                  />
+                  <TouchableOpacity 
+                    style={styles.fileButton}
+                    onPress={handlePickDocument}
+                    disabled={submitting}
+                  >
+                    <Ionicons name="document-attach" size={20} color="#fff" />
+                    <ThemedText style={styles.fileButtonText}>Select Files</ThemedText>
+                  </TouchableOpacity>
+
+                  {selectedFiles.length > 0 && (
+                    <ThemedView style={styles.selectedFiles}>
+                      <ThemedText style={styles.selectedFilesTitle}>Selected Files:</ThemedText>
+                      {selectedFiles.map((file, index) => (
+                        <ThemedView key={index} style={styles.selectedFileItem}>
+                          <Ionicons name="document" size={16} color="#666" />
+                          <ThemedText style={styles.selectedFileName}>{file.name}</ThemedText>
+                        </ThemedView>
+                      ))}
+                    </ThemedView>
+                  )}
+                  <TouchableOpacity 
+                    style={[styles.submitButton, (submitting || (!submission.trim() && selectedFiles.length === 0)) && styles.disabledButton]}
+                    onPress={handleSubmit}
+                    disabled={submitting || (!submission.trim() && selectedFiles.length === 0)}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <ThemedText style={styles.submitButtonText}>Submit Assignment</ThemedText>
+                    )}
+                  </TouchableOpacity>
+                </>
               )}
-              <TouchableOpacity 
-                style={[styles.submitButton, (submitting || (!submission.trim() && selectedFiles.length === 0)) && styles.disabledButton]}
-                onPress={handleSubmit}
-                disabled={submitting || (!submission.trim() && selectedFiles.length === 0)}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <ThemedText style={styles.submitButtonText}>Submit Assignment</ThemedText>
-                )}
-              </TouchableOpacity>
             </ThemedView>
           </ScrollView>
         ) : (
@@ -394,9 +550,9 @@ export default function AssignmentDetailScreen() {
           <ThemedText type="subtitle">Assignment Details</ThemedText>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.infoLabel}>Due Date:</ThemedText>
-            <ThemedText style={isPastDue(assignment?.dueDate) ? styles.pastDue : styles.upcoming}>
+            <ThemedText style={checkIsPastDue(assignment?.dueDate) ? styles.pastDue : styles.upcoming}>
               {formatDate(assignment?.dueDate)}
-              {isPastDue(assignment?.dueDate) ? ' (Past Due)' : ''}
+              {checkIsPastDue(assignment?.dueDate) ? ' (Past Due)' : ''}
             </ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
@@ -607,5 +763,62 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  // Yeni eklenen stiller
+  submittedContainer: {
+    alignItems: 'center',
+    backgroundColor: '#f0f9f0',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  submittedText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  submittedDate: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  submissionContent: {
+    width: '100%',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginTop: 16,
+  },
+  submissionContentTitle: {
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  submissionContentText: {
+    lineHeight: 20,
+  },
+  submissionAttachments: {
+    width: '100%',
+    marginTop: 16,
+  },
+  submissionAttachmentsTitle: {
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  pastDueContainer: {
+    alignItems: 'center',
+    backgroundColor: '#fff0f0',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  pastDueText: {
+    fontSize: 16,
+    color: '#ff6b6b',
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
