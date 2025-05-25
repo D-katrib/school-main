@@ -49,6 +49,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="grades"
+        options={{
+          title: 'Grades',
+          tabBarIcon: ({ color }) => <MaterialIcons name="school" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

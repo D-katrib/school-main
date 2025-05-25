@@ -397,56 +397,77 @@ export default function AssignmentDetailScreen() {
             {/* Show submission section only for students */}
             {userRole === 'student' && (
               <ThemedView style={styles.submissionSection}>
-                {studentSubmission ? (
+                {!hasSubmitted ? (
                   <>
-                    <ThemedText type="subtitle">Your Submission</ThemedText>
-                    <ThemedText style={styles.submissionDate}>
-                      Submitted: {formatDate(studentSubmission.submittedAt)}
-                    </ThemedText>
-                    <ThemedText style={styles.submissionContent}>
-                      {studentSubmission.content}
-                    </ThemedText>
-                    {studentSubmission.attachments && studentSubmission.attachments.length > 0 && (
-                      <ThemedView style={styles.submissionAttachments}>
-                        <ThemedText style={styles.label}>Submitted Files:</ThemedText>
-                        {studentSubmission.attachments.map((attachment) => (
-                          <TouchableOpacity
-                            key={attachment._id}
-                            style={styles.attachmentItem}
-                            onPress={() => openAttachment(attachment)}
-                          >
-                            <Ionicons name="document-outline" size={20} color="#666" />
-                            <ThemedText style={styles.attachmentName}>
-                              {attachment.fileName}
-                            </ThemedText>
-                          </TouchableOpacity>
-                        ))}
-                      </ThemedView>
-                    )}
-                    {studentSubmission.score !== undefined && (
-                      <ThemedView style={styles.gradeSection}>
-                        <ThemedText type="subtitle">Grade</ThemedText>
-                        <ThemedText style={styles.score}>
-                          Score: {studentSubmission.score} / {assignment.totalPoints}
-                        </ThemedText>
-                        {studentSubmission.feedback && (
-                          <ThemedText style={styles.feedback}>
-                            Feedback: {studentSubmission.feedback}
+                    <ThemedText type="subtitle">Submit Assignment</ThemedText>
+                    <TextInput
+                      style={styles.answerInput}
+                      placeholder="Type your answer here..."
+                      multiline
+                      value={submission}
+                      onChangeText={setSubmission}
+                      placeholderTextColor="#666"
+                    />
+
+                    <ThemedView style={styles.fileSection}>
+                      <TouchableOpacity 
+                        style={styles.uploadButton}
+                        onPress={handlePickDocument}
+                      >
+                        <Ionicons name="cloud-upload-outline" size={24} color="#fff" />
+                        <ThemedText style={styles.uploadButtonText}>Upload Files</ThemedText>
+                      </TouchableOpacity>
+
+                      <ThemedText style={styles.fileInfo}>
+                        Max 5MB per file. Accepted formats: PDF, Images, Word documents
+                      </ThemedText>
+
+                      {selectedFiles.map((file, index) => (
+                        <ThemedView key={index} style={styles.fileItem}>
+                          <Ionicons name="document-outline" size={20} color="#666" />
+                          <ThemedText style={styles.fileName} numberOfLines={1}>
+                            {file.name}
                           </ThemedText>
-                        )}
-                      </ThemedView>
-                    )}
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSelectedFiles(files => files.filter((_, i) => i !== index));
+                            }}
+                            style={styles.removeFileButton}
+                          >
+                            <Ionicons name="close-circle" size={24} color="#ff6b6b" />
+                          </TouchableOpacity>
+                        </ThemedView>
+                      ))}
+                    </ThemedView>
+
+                    <TouchableOpacity
+                      style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                      onPress={handleSubmit}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <ThemedText style={styles.submitButtonText}>Submit Assignment</ThemedText>
+                      )}
+                    </TouchableOpacity>
                   </>
                 ) : (
-                  <ThemedView style={styles.submitSection}>
-                    <TouchableOpacity
-                      style={styles.submitButton}
-                      onPress={handleSubmit}
-                    >
-                      <ThemedText style={styles.submitButtonText}>
-                        Submit Assignment
-                      </ThemedText>
-                    </TouchableOpacity>
+                  <ThemedView style={styles.submittedMessage}>
+                    <Ionicons name="checkmark-circle" size={48} color="#4caf50" />
+                    <ThemedText style={styles.submittedText}>
+                      You have already submitted this assignment
+                    </ThemedText>
+                    {studentSubmission && (
+                      <>
+                        <ThemedText style={styles.submissionDate}>
+                          Submitted on: {formatDate(studentSubmission.submittedAt)}
+                        </ThemedText>
+                        <ThemedText style={styles.submissionContent}>
+                          {studentSubmission.content}
+                        </ThemedText>
+                      </>
+                    )}
                   </ThemedView>
                 )}
               </ThemedView>
@@ -624,5 +645,70 @@ const styles = StyleSheet.create({
   },
   feedback: {
     color: '#666',
+  },
+  answerInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 16,
+    minHeight: 120,
+    textAlignVertical: 'top',
+    color: '#000',
+    backgroundColor: '#fff',
+  },
+  fileSection: {
+    marginBottom: 16,
+  },
+  uploadButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  fileInfo: {
+    color: '#666',
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  fileName: {
+    flex: 1,
+    marginLeft: 8,
+    color: '#000',
+  },
+  removeFileButton: {
+    padding: 4,
+  },
+  submittedMessage: {
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
+  submittedText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#4caf50',
+    fontWeight: 'bold',
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 8,
   },
 }); 

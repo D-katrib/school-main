@@ -125,7 +125,7 @@ export default function AssignmentsScreen() {
         <ThemedView style={styles.assignmentContent}>
           <ThemedText type="subtitle">{item.title}</ThemedText>
           <ThemedText style={styles.courseText}>
-            {item.course.name} ({item.course.code})
+            {item.course ? `${item.course.name} (${item.course.code})` : 'No Course Assigned'}
           </ThemedText>
           <ThemedView style={styles.assignmentFooter}>
             <ThemedText style={isPastDue(item.dueDate) ? styles.pastDue : styles.upcoming}>

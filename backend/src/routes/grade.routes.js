@@ -147,31 +147,27 @@ router.get('/', getGrades);
 
 /**
  * @swagger
- * /grades/summary:
+ * /grades/summary/{courseId}:
  *   get:
- *     summary: Get grade summary
- *     description: Retrieve grade summaries for courses or students. Results are filtered based on user role.
+ *     summary: Get grade summary for a course
+ *     description: Retrieve grade summary for a specific course. Results are filtered based on user role.
  *     tags: [Grades]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: student
+ *       - in: path
+ *         name: courseId
+ *         required: true
  *         schema:
  *           type: string
- *         description: Get summary for a specific student
- *       - in: query
- *         name: course
- *         schema:
- *           type: string
- *         description: Get summary for a specific course
+ *         description: Course ID to get summary for
  *     responses:
  *       200:
  *         description: Grade summary
  *       401:
  *         description: Not authorized
  */
-router.get('/summary', getGradeSummary);
+router.get('/summary/:courseId', getGradeSummary);
 
 /**
  * @swagger

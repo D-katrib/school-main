@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '../../../components/ThemedView';
+import { ThemedText } from '../../../components/ThemedText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { assignmentService } from '@/services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { assignmentService } from '../../../services/api';
+import * as Linking from 'expo-linking';
 
 interface Submission {
   _id: string;
@@ -18,97 +18,83 @@ interface Submission {
   };
   content: string;
   attachments: Array<{
-    _id: string;
-    filename: string;
-    url: string;
+    fileName: string;
+    fileUrl: string;
   }>;
   submittedAt: string;
-  status: string;
   score?: number;
   feedback?: string;
-  gradedBy?: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-  };
-  gradedAt?: string;
+  status: 'submitted' | 'graded' | 'returned';
+  isLate: boolean;
+}
+
+interface Assignment {
+  _id: string;
+  title: string;
+  totalPoints: number;
+  submissions: Submission[];
 }
 
 export default function SubmissionsScreen() {
   const { id } = useLocalSearchParams();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string>('');
-  
-  // New state for editing
-  const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
-  const [editingScore, setEditingScore] = useState('');
-  const [editingFeedback, setEditingFeedback] = useState('');
+  const [error, setError] = useState('');
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [score, setScore] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [grading, setGrading] = useState(false);
 
   useEffect(() => {
-    const loadUserRole = async () => {
-      const role = await AsyncStorage.getItem('userRole');
-      setUserRole(role || '');
-    };
-    loadUserRole();
+    fetchAssignment();
   }, []);
 
-  useEffect(() => {
-    fetchSubmissions();
-  }, [id]);
-
-  const fetchSubmissions = async () => {
+  const fetchAssignment = async () => {
     try {
       setLoading(true);
-      const data = await assignmentService.getSubmissions(id as string);
-      setSubmissions(data);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching submissions:', err);
+      const data = await assignmentService.getAssignmentById(id as string);
+      setAssignment(data);
+    } catch (error) {
+      console.error('Error fetching assignment:', error);
       setError('Failed to load submissions');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGradeSubmission = async (submissionId: string, score: number, feedback: string) => {
-    try {
-      await assignmentService.gradeSubmission(submissionId, {
-        score,
-        feedback,
-        publishGrade: true
-      });
-      Alert.alert('Success', 'Submission graded successfully');
-      setEditingSubmissionId(null);
-      setEditingScore('');
-      setEditingFeedback('');
-      fetchSubmissions(); // Refresh the list
-    } catch (err) {
-      console.error('Error grading submission:', err);
-      Alert.alert('Error', 'Failed to grade submission');
-    }
-  };
+  const handleGradeSubmission = async () => {
+    if (!selectedSubmission) return;
 
-  const startEditing = (submission: Submission) => {
-    setEditingSubmissionId(submission._id);
-    setEditingScore(submission.score?.toString() || '');
-    setEditingFeedback(submission.feedback || '');
-  };
-
-  const cancelEditing = () => {
-    setEditingSubmissionId(null);
-    setEditingScore('');
-    setEditingFeedback('');
-  };
-
-  const saveGrade = (submissionId: string) => {
-    const numericScore = parseFloat(editingScore);
-    if (isNaN(numericScore)) {
+    if (!score || isNaN(Number(score))) {
       Alert.alert('Error', 'Please enter a valid score');
       return;
     }
-    handleGradeSubmission(submissionId, numericScore, editingFeedback);
+
+    const numericScore = Number(score);
+    if (numericScore < 0 || numericScore > (assignment?.totalPoints || 0)) {
+      Alert.alert('Error', `Score must be between 0 and ${assignment?.totalPoints}`);
+      return;
+    }
+
+    try {
+      setGrading(true);
+      await assignmentService.gradeSubmission(selectedSubmission._id, {
+        score: numericScore,
+        feedback,
+        publishGrade: true
+      });
+
+      Alert.alert('Success', 'Submission graded successfully');
+      setSelectedSubmission(null);
+      setScore('');
+      setFeedback('');
+      fetchAssignment(); // Refresh the submissions list
+    } catch (error) {
+      console.error('Error grading submission:', error);
+      Alert.alert('Error', 'Failed to grade submission');
+    } finally {
+      setGrading(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -122,108 +108,13 @@ export default function SubmissionsScreen() {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  const renderSubmission = (submission: Submission) => {
-    const isEditing = editingSubmissionId === submission._id;
-
-    return (
-      <ThemedView key={submission._id} style={styles.submissionCard}>
-        <ThemedView style={styles.submissionHeader}>
-          <ThemedText type="subtitle">
-            {submission.student.firstName} {submission.student.lastName}
-          </ThemedText>
-          <ThemedText style={styles.submissionDate}>
-            Submitted: {formatDate(submission.submittedAt)}
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.submissionContent}>
-          <ThemedText>{submission.content}</ThemedText>
-          
-          {submission.attachments.length > 0 && (
-            <ThemedView style={styles.attachments}>
-              <ThemedText type="subtitle">Attachments:</ThemedText>
-              {submission.attachments.map(attachment => (
-                <TouchableOpacity 
-                  key={attachment._id}
-                  style={styles.attachment}
-                  onPress={() => {/* Handle attachment view */}}
-                >
-                  <Ionicons name="document-outline" size={20} color="#666" />
-                  <ThemedText style={styles.attachmentName}>{attachment.filename}</ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ThemedView>
-          )}
-        </ThemedView>
-
-        {(userRole === 'teacher' || userRole === 'admin') && (
-          <ThemedView style={styles.gradingSection}>
-            {isEditing ? (
-              <>
-                <ThemedView style={styles.gradeInputContainer}>
-                  <ThemedText>Score:</ThemedText>
-                  <TextInput
-                    style={styles.scoreInput}
-                    value={editingScore}
-                    onChangeText={setEditingScore}
-                    keyboardType="numeric"
-                    placeholder="Enter score"
-                  />
-                </ThemedView>
-                <ThemedView style={styles.feedbackInputContainer}>
-                  <ThemedText>Feedback:</ThemedText>
-                  <TextInput
-                    style={styles.feedbackInput}
-                    value={editingFeedback}
-                    onChangeText={setEditingFeedback}
-                    multiline
-                    placeholder="Enter feedback"
-                  />
-                </ThemedView>
-                <ThemedView style={styles.gradeActions}>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.saveButton]}
-                    onPress={() => saveGrade(submission._id)}
-                  >
-                    <ThemedText style={styles.buttonText}>Save</ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.cancelButton]}
-                    onPress={cancelEditing}
-                  >
-                    <ThemedText style={styles.buttonText}>Cancel</ThemedText>
-                  </TouchableOpacity>
-                </ThemedView>
-              </>
-            ) : (
-              <ThemedView style={styles.gradeDisplay}>
-                {submission.score !== undefined ? (
-                  <>
-                    <ThemedText type="subtitle">Grade: {submission.score}</ThemedText>
-                    {submission.feedback && (
-                      <ThemedText style={styles.feedback}>Feedback: {submission.feedback}</ThemedText>
-                    )}
-                    <TouchableOpacity 
-                      style={[styles.button, styles.editButton]}
-                      onPress={() => startEditing(submission)}
-                    >
-                      <ThemedText style={styles.buttonText}>Edit Grade</ThemedText>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity 
-                    style={[styles.button, styles.gradeButton]}
-                    onPress={() => startEditing(submission)}
-                  >
-                    <ThemedText style={styles.buttonText}>Grade Submission</ThemedText>
-                  </TouchableOpacity>
-                )}
-              </ThemedView>
-            )}
-          </ThemedView>
-        )}
-      </ThemedView>
-    );
+  const openAttachment = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('Error opening attachment:', error);
+      Alert.alert('Error', 'Failed to open attachment');
+    }
   };
 
   if (loading) {
@@ -231,7 +122,7 @@ export default function SubmissionsScreen() {
       <SafeAreaView style={styles.container}>
         <ThemedView style={styles.loadingContainer}>
           <ActivityIndicator size="large" />
-          <ThemedText style={styles.loadingText}>Loading submissions...</ThemedText>
+          <ThemedText style={{ marginTop: 16 }}>Loading submissions...</ThemedText>
         </ThemedView>
       </SafeAreaView>
     );
@@ -242,7 +133,13 @@ export default function SubmissionsScreen() {
       <SafeAreaView style={styles.container}>
         <ThemedView style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <ThemedText style={{ marginTop: 16 }}>{error}</ThemedText>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={fetchAssignment}
+          >
+            <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+          </TouchableOpacity>
         </ThemedView>
       </SafeAreaView>
     );
@@ -250,7 +147,7 @@ export default function SubmissionsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.scrollView}>
         <ThemedView style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -260,15 +157,128 @@ export default function SubmissionsScreen() {
             <ThemedText style={styles.backButtonText}>Back</ThemedText>
           </TouchableOpacity>
           <ThemedText type="title">Submissions</ThemedText>
+          {assignment && (
+            <ThemedText style={styles.assignmentTitle}>{assignment.title}</ThemedText>
+          )}
         </ThemedView>
 
-        {submissions.length === 0 ? (
-          <ThemedView style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={48} color="#888" />
-            <ThemedText style={styles.emptyText}>No submissions yet</ThemedText>
+        {selectedSubmission ? (
+          <ThemedView style={styles.gradingSection}>
+            <ThemedText type="subtitle">Grade Submission</ThemedText>
+            <ThemedText style={styles.studentName}>
+              Student: {selectedSubmission.student.firstName} {selectedSubmission.student.lastName}
+            </ThemedText>
+            
+            <ThemedView style={styles.submissionContent}>
+              <ThemedText style={styles.label}>Submission:</ThemedText>
+              <ThemedText style={styles.content}>{selectedSubmission.content}</ThemedText>
+              
+              {selectedSubmission.attachments.length > 0 && (
+                <ThemedView style={styles.attachments}>
+                  <ThemedText style={styles.label}>Attachments:</ThemedText>
+                  {selectedSubmission.attachments.map((attachment, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.attachmentItem}
+                      onPress={() => openAttachment(attachment.fileUrl)}
+                    >
+                      <Ionicons name="document-outline" size={20} color="#666" />
+                      <ThemedText style={styles.attachmentName}>{attachment.fileName}</ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </ThemedView>
+              )}
+            </ThemedView>
+
+            <ThemedView style={styles.gradingForm}>
+              <ThemedText style={styles.label}>Score (out of {assignment?.totalPoints}):</ThemedText>
+              <TextInput
+                style={styles.scoreInput}
+                value={score}
+                onChangeText={setScore}
+                keyboardType="numeric"
+                placeholder="Enter score"
+                placeholderTextColor="#666"
+              />
+
+              <ThemedText style={styles.label}>Feedback:</ThemedText>
+              <TextInput
+                style={styles.feedbackInput}
+                value={feedback}
+                onChangeText={setFeedback}
+                multiline
+                placeholder="Enter feedback for student"
+                placeholderTextColor="#666"
+              />
+
+              <ThemedView style={styles.gradingButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setSelectedSubmission(null);
+                    setScore('');
+                    setFeedback('');
+                  }}
+                >
+                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.gradeButton, grading && styles.gradingButtonDisabled]}
+                  onPress={handleGradeSubmission}
+                  disabled={grading}
+                >
+                  {grading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.gradeButtonText}>Submit Grade</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </ThemedView>
+            </ThemedView>
           </ThemedView>
         ) : (
-          submissions.map(renderSubmission)
+          <ThemedView style={styles.submissionsList}>
+            {assignment?.submissions?.length === 0 ? (
+              <ThemedView style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={48} color="#666" />
+                <ThemedText style={styles.emptyStateText}>No submissions yet</ThemedText>
+              </ThemedView>
+            ) : (
+              assignment?.submissions?.map((submission) => (
+                <TouchableOpacity
+                  key={submission._id}
+                  style={styles.submissionCard}
+                  onPress={() => setSelectedSubmission(submission)}
+                >
+                  <ThemedView style={styles.submissionHeader}>
+                    <ThemedText style={styles.studentName}>
+                      {submission.student.firstName} {submission.student.lastName}
+                    </ThemedText>
+                    {submission.status === 'graded' && (
+                      <ThemedText style={styles.score}>
+                        Score: {submission.score}/{assignment.totalPoints}
+                      </ThemedText>
+                    )}
+                  </ThemedView>
+
+                  <ThemedView style={styles.submissionDetails}>
+                    <ThemedText style={styles.submissionDate}>
+                      Submitted: {formatDate(submission.submittedAt)}
+                      {submission.isLate && (
+                        <ThemedText style={styles.lateTag}> (Late)</ThemedText>
+                      )}
+                    </ThemedText>
+                    <ThemedText style={styles.submissionStatus}>
+                      Status: {submission.status.charAt(0).toUpperCase() + submission.status.slice(1)}
+                    </ThemedText>
+                  </ThemedView>
+
+                  <Ionicons name="chevron-forward" size={24} color="#666" />
+                </TouchableOpacity>
+              ))
+            )}
+          </ThemedView>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -279,143 +289,214 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 8,
   },
   backButtonText: {
     marginLeft: 8,
     color: '#007AFF',
+    fontSize: 16,
+  },
+  assignmentTitle: {
+    color: '#666',
+    marginTop: 4,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 16,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  errorText: {
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
     marginTop: 16,
-    color: '#ff6b6b',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 40,
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
-  emptyText: {
-    marginTop: 16,
-    color: '#888',
+  submissionsList: {
+    padding: 16,
   },
   submissionCard: {
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 8,
     backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   submissionHeader: {
-    marginBottom: 12,
+    flex: 1,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  submissionDetails: {
+    marginRight: 8,
   },
   submissionDate: {
     color: '#666',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 14,
+  },
+  submissionStatus: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  lateTag: {
+    color: '#ff6b6b',
+  },
+  score: {
+    color: '#4caf50',
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyStateText: {
+    color: '#666',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  gradingSection: {
+    padding: 16,
   },
   submissionContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  label: {
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  content: {
+    color: '#333',
     marginBottom: 16,
   },
   attachments: {
-    marginTop: 12,
+    marginTop: 16,
   },
-  attachment: {
+  attachmentItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 8,
+    borderRadius: 4,
     marginTop: 8,
   },
   attachmentName: {
     marginLeft: 8,
-    color: '#666',
+    color: '#333',
   },
-  gradingSection: {
+  gradingForm: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
     marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  gradeInputContainer: {
-    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   scoreInput: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 8,
-    marginTop: 4,
-  },
-  feedbackInputContainer: {
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 16,
+    color: '#000',
+    backgroundColor: '#fff',
   },
   feedbackInput: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 8,
-    marginTop: 4,
-    minHeight: 80,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    minHeight: 100,
     textAlignVertical: 'top',
+    color: '#000',
+    backgroundColor: '#fff',
   },
-  gradeActions: {
+  gradingButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-  },
-  button: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  gradeButton: {
-    backgroundColor: '#007AFF',
-  },
-  editButton: {
-    backgroundColor: '#4CAF50',
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
+    gap: 12,
   },
   cancelButton: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  buttonText: {
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  gradeButton: {
+    backgroundColor: '#4caf50',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  gradeButtonText: {
     color: '#fff',
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  gradeDisplay: {
-    alignItems: 'flex-start',
-  },
-  feedback: {
-    marginTop: 8,
-    marginBottom: 12,
+  gradingButtonDisabled: {
+    opacity: 0.7,
   },
 }); 

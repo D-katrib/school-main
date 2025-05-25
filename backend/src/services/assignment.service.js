@@ -80,14 +80,18 @@ exports.getAssignments = async (queryParams, user) => {
   // Populate course
   query = query.populate({
     path: 'course',
-    select: 'name code'
+    select: 'name code',
+    match: { _id: { $exists: true } }  // Only populate if course exists
   }).populate({
     path: 'createdBy',
     select: 'firstName lastName'
   });
   
   // Executing query
-  const assignments = await query;
+  let assignments = await query;
+  
+  // Filter out assignments with null course
+  assignments = assignments.filter(assignment => assignment.course);
   
   // Pagination result
   const pagination = {};
@@ -593,61 +597,114 @@ exports.getSubmissions = async (assignmentId, user) => {
  * @returns {Object} Updated submission
  */
 exports.gradeSubmission = async (submissionId, gradeData, user) => {
-  let submission = await Submission.findById(submissionId);
-  
-  if (!submission) {
-    const error = new Error(`Submission not found with id of ${submissionId}`);
-    error.statusCode = 404;
+  try {
+    let submission = await Submission.findById(submissionId);
+    
+    if (!submission) {
+      const error = new Error(`Submission not found with id of ${submissionId}`);
+      error.statusCode = 404;
+      throw error;
+    }
+    
+    // Get assignment and course
+    const assignment = await Assignment.findById(submission.assignment);
+    const course = await Course.findById(assignment.course);
+    
+    // Make sure user is course teacher or admin
+    if (user.role === 'teacher' && course.teacher.toString() !== user.id) {
+      const error = new Error('Not authorized to grade this submission');
+      error.statusCode = 403;
+      throw error;
+    }
+    
+    // Update submission with grade and feedback
+    submission.score = gradeData.score;
+    submission.feedback = gradeData.feedback;
+    submission.gradedBy = user.id;
+    submission.gradedAt = Date.now();
+    submission.status = 'graded';
+    
+    await submission.save();
+    
+    // Handle grade record using native MongoDB operation
+    const Grade = require('../models/grade.model');
+    const mongoose = require('mongoose');
+    const now = Date.now();
+    
+    // Get the native collection
+    const gradeCollection = mongoose.connection.collection('grades');
+    
+    // Prepare the update operation
+    const filter = {
+      student: new mongoose.Types.ObjectId(submission.student),
+      course: new mongoose.Types.ObjectId(course._id),
+      assignment: new mongoose.Types.ObjectId(assignment._id),
+      type: 'assignment'
+    };
+    
+    const update = {
+      $set: {
+        score: submission.score,
+        maxScore: assignment.totalPoints,
+        comments: submission.feedback,
+        gradedBy: new mongoose.Types.ObjectId(user.id),
+        gradedAt: now,
+        isPublished: gradeData.publishGrade || false,
+        updatedAt: now
+      }
+    };
+    
+    if (gradeData.publishGrade) {
+      update.$set.publishedAt = now;
+    }
+    
+    // Calculate percentage and letter grade
+    const percentage = (submission.score / assignment.totalPoints) * 100;
+    let letterGrade;
+    if (percentage >= 90) {
+      letterGrade = 'A';
+    } else if (percentage >= 80) {
+      letterGrade = 'B';
+    } else if (percentage >= 70) {
+      letterGrade = 'C';
+    } else if (percentage >= 60) {
+      letterGrade = 'D';
+    } else {
+      letterGrade = 'F';
+    }
+    
+    update.$set.percentage = percentage;
+    update.$set.letterGrade = letterGrade;
+    
+    // Add createdAt for new documents
+    update.$setOnInsert = {
+      createdAt: now
+    };
+    
+    // Perform the update operation with upsert
+    const result = await gradeCollection.updateOne(
+      filter,
+      update,
+      { upsert: true }
+    );
+    
+    // Notify student of graded submission
+    await Notification.createNotification({
+      recipient: submission.student,
+      sender: user.id,
+      type: 'grade',
+      title: 'Assignment Graded',
+      message: `Your submission for "${assignment.title}" has been graded`,
+      relatedResource: {
+        resourceType: 'submission',
+        resourceId: submission._id
+      },
+      priority: 'high'
+    });
+    
+    return submission;
+  } catch (error) {
+    console.error('Error in gradeSubmission:', error);
     throw error;
   }
-  
-  // Get assignment and course
-  const assignment = await Assignment.findById(submission.assignment);
-  const course = await Course.findById(assignment.course);
-  
-  // Make sure user is course teacher or admin
-  if (user.role === 'teacher' && course.teacher.toString() !== user.id) {
-    const error = new Error('Not authorized to grade this submission');
-    error.statusCode = 403;
-    throw error;
-  }
-  
-  // Update submission with grade and feedback
-  submission.score = gradeData.score;
-  submission.feedback = gradeData.feedback;
-  submission.gradedBy = user.id;
-  submission.gradedAt = Date.now();
-  submission.status = 'graded';
-  
-  await submission.save();
-  
-  // Create grade record
-  const Grade = require('../models/grade.model');
-  await Grade.create({
-    student: submission.student,
-    course: course._id,
-    assignment: assignment._id,
-    type: 'assignment',
-    score: submission.score,
-    maxScore: assignment.totalPoints,
-    comments: submission.feedback,
-    gradedBy: user.id,
-    isPublished: gradeData.publishGrade || false
-  });
-  
-  // Notify student of graded submission
-  await Notification.createNotification({
-    recipient: submission.student,
-    sender: user.id,
-    type: 'grade',
-    title: 'Assignment Graded',
-    message: `Your submission for "${assignment.title}" has been graded`,
-    relatedResource: {
-      resourceType: 'submission',
-      resourceId: submission._id
-    },
-    priority: 'high'
-  });
-  
-  return submission;
 };
