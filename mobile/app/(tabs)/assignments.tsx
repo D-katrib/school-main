@@ -108,9 +108,18 @@ export default function AssignmentsScreen() {
       <TouchableOpacity 
         style={styles.assignmentCardContent}
         onPress={() => {
-          // Navigate to assignment detail screen
-          // @ts-ignore - Expo Router types are sometimes too strict
-          router.push(`/assignment/${item._id}`);
+          if (userRole === 'teacher' || userRole === 'admin') {
+            // Navigate to submissions view for teachers
+            // @ts-ignore - Expo Router types are sometimes too strict
+            router.push({
+              pathname: '/assignment/[id]/submissions',
+              params: { id: item._id }
+            });
+          } else {
+            // Navigate to assignment detail screen for students
+            // @ts-ignore - Expo Router types are sometimes too strict
+            router.push(`/assignment/${item._id}`);
+          }
         }}
       >
         <ThemedView style={styles.assignmentContent}>
@@ -123,10 +132,24 @@ export default function AssignmentsScreen() {
               Due: {formatDate(item.dueDate)}
               {isPastDue(item.dueDate) ? ' (Past Due)' : ''}
             </ThemedText>
-            {item.hasSubmitted && (
+            {userRole === 'student' && item.hasSubmitted && (
               <ThemedView style={styles.submittedBadge}>
                 <ThemedText style={styles.submittedText}>Submitted</ThemedText>
               </ThemedView>
+            )}
+            {(userRole === 'teacher' || userRole === 'admin') && (
+              <TouchableOpacity 
+                style={styles.viewSubmissionsButton}
+                onPress={() => {
+                  // @ts-ignore - Expo Router types are sometimes too strict
+                  router.push({
+                    pathname: '/assignment/[id]/submissions',
+                    params: { id: item._id }
+                  });
+                }}
+              >
+                <ThemedText style={styles.viewSubmissionsText}>View Submissions</ThemedText>
+              </TouchableOpacity>
             )}
           </ThemedView>
         </ThemedView>
@@ -344,5 +367,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  viewSubmissionsButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  viewSubmissionsText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
   },
 }); 

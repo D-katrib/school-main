@@ -26,7 +26,7 @@ const getAuthToken = async () => {
 
 // Using your computer's actual local IP address from the Wi-Fi adapter
 // This allows Expo on a physical device to connect to your backend
-const API_URL = 'http://192.168.1.9:5000/api';
+const API_URL = 'http://192.168.1.6:5000/api';
 
 // Alternative localhost option
 // const API_URL = 'http://localhost:5000/api';
@@ -439,6 +439,21 @@ export const assignmentService = {
    */
   getSubmissions: async (assignmentId: string) => {
     const response = await api.get(`/assignments/${assignmentId}/submissions`);
+    // Handle the response format consistently
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return response.data;
+  },
+
+  /**
+   * Grade a submission
+   * @param submissionId Submission ID
+   * @param gradeData Grade data including score, feedback, and publishGrade
+   * @returns Updated submission
+   */
+  gradeSubmission: async (submissionId: string, gradeData: { score: number; feedback?: string; publishGrade?: boolean }) => {
+    const response = await api.put(`/assignments/submissions/${submissionId}`, gradeData);
     // Handle the response format consistently
     if (response.data && response.data.data) {
       return response.data.data;
