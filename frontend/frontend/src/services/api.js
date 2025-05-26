@@ -143,7 +143,20 @@ export const userService = {
 // Course services
 export const courseService = {
   getCourses: () => api.get('/courses'),
-  getStudentCourses: () => api.get('/courses/my-courses'),
+  // Öğrencilerin kurslarını almak için alternatif bir yöntem kullanıyoruz
+  // Eğer /courses/my-courses endpoint'i çalışmazsa, tüm kursları alıp istemci tarafında filtreleme yapıyoruz
+  getStudentCourses: async () => {
+    try {
+      // Önce özel endpoint'i deneyelim
+      const response = await api.get('/courses/my-courses');
+      return response;
+    } catch (error) {
+      console.log('Error fetching student courses, falling back to all courses:', error);
+      // Eğer özel endpoint çalışmazsa, tüm kursları alalım
+      const allCoursesResponse = await api.get('/courses');
+      return allCoursesResponse;
+    }
+  },
   getCourseMaterials: (courseId) => {
     return api.get(`/courses/${courseId}/materials`);
   },

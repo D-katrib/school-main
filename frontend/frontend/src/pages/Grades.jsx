@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { gradeService, courseService } from '../services/api';
+import { gradeService, courseService, assignmentService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { handleApiError } from '../services/api';
 
 const Grades = () => {
   const { currentUser } = useAuth();
@@ -9,9 +10,12 @@ const Grades = () => {
   const [grades, setGrades] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [assignments, setAssignments] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
 
   useEffect(() => {
     fetchCourses();
+    fetchAssignments();
   }, []);
 
   useEffect(() => {
@@ -23,33 +27,162 @@ const Grades = () => {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await courseService.getCourses();
-      // Convert object to array if needed
-      const coursesArray = Array.isArray(response.data) ? response.data : Object.values(response.data);
-      setCourses(coursesArray);
-      if (coursesArray.length > 0 && !selectedCourse) {
-        setSelectedCourse(coursesArray[0]._id);
+      console.log('Fetching courses...');
+      
+      // For students, use getStudentCourses
+      let response;
+      if (currentUser && currentUser.role === 'student') {
+        console.log('Fetching student courses...');
+        response = await courseService.getStudentCourses();
+      } else {
+        console.log('Fetching all courses...');
+        response = await courseService.getCourses();
+      }
+      
+      console.log('Courses response:', response);
+      
+      // Handle different response formats
+      let coursesArray = [];
+      if (response.data?.data) {
+        console.log('Using response.data.data');
+        coursesArray = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        console.log('Using response.data array');
+        coursesArray = response.data;
+      } else if (typeof response.data === 'object' && response.data !== null) {
+        console.log('Using Object.values(response.data)');
+        coursesArray = Object.values(response.data);
+      }
+      
+      console.log(`Found ${coursesArray.length} courses:`, coursesArray);
+      
+      // Make sure we have valid course objects
+      const validCourses = coursesArray.filter(course => course && course._id);
+      console.log(`Found ${validCourses.length} valid courses with IDs`);
+      
+      setCourses(validCourses);
+      
+      if (validCourses.length > 0 && !selectedCourse) {
+        console.log(`Setting selected course to: ${validCourses[0]._id}`);
+        setSelectedCourse(validCourses[0]._id);
+      } else if (validCourses.length === 0) {
+        console.log('No valid courses found');
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
-      setError('Failed to load courses');
+      setError(handleApiError(error));
       setCourses([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchAssignments = async () => {
+    if (!currentUser || currentUser.role !== 'student') return;
+    
+    try {
+      setLoading(true);
+      console.log('Fetching assignments for student...');
+      const response = await assignmentService.getAssignments();
+      console.log('Assignments response:', response);
+      
+      // Handle different response formats
+      let assignmentsData = [];
+      if (response.data?.data) {
+        assignmentsData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        assignmentsData = response.data;
+      } else if (typeof response.data === 'object') {
+        assignmentsData = Object.values(response.data);
+      }
+      
+      console.log(`Found ${assignmentsData.length} assignments`);
+      setAssignments(assignmentsData);
+      
+      // For each assignment, check if there's a submission with a grade
+      const submissionsPromises = assignmentsData.map(async (assignment) => {
+        try {
+          console.log(`Fetching details for assignment: ${assignment._id}`);
+          // Get assignment details including submission
+          const detailsResponse = await assignmentService.getAssignmentById(assignment._id);
+          console.log('Assignment details response:', detailsResponse);
+          
+          let assignmentWithSubmission = null;
+          if (detailsResponse.data?.data) {
+            assignmentWithSubmission = detailsResponse.data.data;
+          } else if (typeof detailsResponse.data === 'object') {
+            assignmentWithSubmission = detailsResponse.data;
+          }
+          
+          if (assignmentWithSubmission && assignmentWithSubmission.submission) {
+            console.log(`Found submission for assignment ${assignment._id}:`, assignmentWithSubmission.submission);
+            // If there's a submission with a grade, add it to our grades list
+            const submission = assignmentWithSubmission.submission;
+            if (submission.score !== undefined) {
+              console.log(`Submission has score: ${submission.score}`);
+              return {
+                _id: `submission-${submission._id || Date.now()}`,
+                assignment: {
+                  _id: assignment._id,
+                  title: assignment.title,
+                },
+                course: assignment.course,
+                student: currentUser._id,
+                score: submission.score,
+                maxScore: assignment.maxScore || 100,
+                feedback: submission.feedback || '',
+                type: 'Assignment',
+                submittedAt: submission.submittedAt || new Date().toISOString(),
+                gradedAt: submission.gradedAt || submission.updatedAt || new Date().toISOString(),
+              };
+            } else {
+              console.log(`Submission has no score yet`);
+            }
+          } else {
+            console.log(`No submission found for assignment ${assignment._id}`);
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error fetching submission for assignment ${assignment._id}:`, error);
+          return null;
+        }
+      });
+      
+      const submissionsResults = await Promise.all(submissionsPromises);
+      // Filter out null values
+      const validSubmissions = submissionsResults.filter(sub => sub !== null);
+      console.log(`Found ${validSubmissions.length} valid submissions with grades`);
+      setSubmissions(validSubmissions);
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+      setError(handleApiError(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const fetchGrades = async () => {
     try {
       setLoading(true);
-      const studentId = currentUser.role === 'student' ? currentUser._id : null;
-      const response = await gradeService.getGrades(studentId, selectedCourse);
-      // Convert object to array if needed
-      const gradesArray = Array.isArray(response.data) ? response.data : Object.values(response.data);
-      setGrades(gradesArray);
+      
+      if (currentUser.role === 'student') {
+        // For students, filter the submissions by selected course
+        const filteredGrades = submissions.filter(grade => 
+          grade.course && grade.course._id === selectedCourse
+        );
+        setGrades(filteredGrades);
+      } else {
+        // For teachers and admins, use the grade service
+        const studentId = null; // We don't filter by student for teachers/admins
+        const response = await gradeService.getGrades(studentId, selectedCourse);
+        // Convert object to array if needed
+        const gradesArray = Array.isArray(response.data) ? response.data : 
+          (response.data?.data ? response.data.data : []);
+        setGrades(gradesArray);
+      }
     } catch (error) {
       console.error('Error fetching grades:', error);
-      setError('Failed to load grades');
+      setError(handleApiError(error));
       setGrades([]); // Set empty array on error
     } finally {
       setLoading(false);

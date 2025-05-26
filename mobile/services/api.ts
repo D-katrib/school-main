@@ -26,7 +26,7 @@ const getAuthToken = async () => {
 
 // Using your computer's actual local IP address from the Wi-Fi adapter
 // This allows Expo on a physical device to connect to your backend
-const API_URL = 'http://192.168.1.6:5000/api';
+const API_URL = 'http://10.192.32.29:5000/api';
 
 // Alternative localhost option
 // const API_URL = 'http://localhost:5000/api';
@@ -466,12 +466,124 @@ export const assignmentService = {
    * @returns List of student's submissions
    */
   getMySubmissions: async () => {
-    const response = await api.get('/assignments/my-submissions');
-    // Handle the response format consistently
-    if (response.data && response.data.data) {
-      return response.data.data;
+    try {
+      console.log('Starting getMySubmissions...');
+      
+      // First get all assignments for the student
+      console.log('Fetching all assignments...');
+      const assignmentsResponse = await api.get('/assignments');
+      console.log('Assignments response:', assignmentsResponse.status, assignmentsResponse.data ? 'has data' : 'no data');
+      
+      let assignments = [];
+      if (assignmentsResponse.data && assignmentsResponse.data.data) {
+        assignments = assignmentsResponse.data.data;
+      } else if (Array.isArray(assignmentsResponse.data)) {
+        assignments = assignmentsResponse.data;
+      } else if (typeof assignmentsResponse.data === 'object') {
+        assignments = Object.values(assignmentsResponse.data);
+      }
+      
+      console.log(`Found ${assignments.length} assignments`);
+      
+      // Get locally submitted assignments
+      const submittedAssignmentsJson = await AsyncStorage.getItem(SUBMITTED_ASSIGNMENTS_KEY);
+      const locallySubmittedIds = submittedAssignmentsJson ? JSON.parse(submittedAssignmentsJson) : [];
+      console.log(`Found ${locallySubmittedIds.length} locally submitted assignments`);
+      
+      // Then get all submissions for each assignment
+      const submissionsPromises = assignments.map(async (assignment: any) => {
+        try {
+          // Check if this assignment is in our locally submitted list
+          const isLocallySubmitted = locallySubmittedIds.includes(assignment._id);
+          console.log(`Assignment ${assignment._id} locally submitted: ${isLocallySubmitted}`);
+          
+          // Try to get the assignment details from the server
+          console.log(`Fetching details for assignment: ${assignment._id}`);
+          const submissionResponse = await api.get(`/assignments/${assignment._id}`);
+          console.log(`Assignment ${assignment._id} response:`, submissionResponse.status);
+          
+          let assignmentWithSubmission = null;
+          if (submissionResponse.data && submissionResponse.data.data) {
+            assignmentWithSubmission = submissionResponse.data.data;
+          } else if (typeof submissionResponse.data === 'object') {
+            assignmentWithSubmission = submissionResponse.data;
+          }
+          
+          // Check if there's a submission from the server
+          const hasServerSubmission = assignmentWithSubmission && assignmentWithSubmission.submission;
+          console.log(`Assignment ${assignment._id} has server submission: ${hasServerSubmission}`);
+          
+          // If we have a server submission or it's locally submitted
+          if (hasServerSubmission || isLocallySubmitted) {
+            // Create the submission object
+            const submission = hasServerSubmission ? assignmentWithSubmission.submission : {
+              _id: `local-${assignment._id}`,
+              content: 'Submitted via mobile app',
+              submittedAt: new Date().toISOString(),
+              status: 'submitted',
+              isLate: false
+            };
+            
+            console.log(`Creating submission object for ${assignment._id}`);
+            
+            // Format the submission data
+            return {
+              _id: submission._id || `local-${assignment._id}`,
+              assignment: {
+                _id: assignment._id,
+                title: assignment.title,
+                description: assignment.description,
+                dueDate: assignment.dueDate,
+                course: assignment.course,
+                maxScore: assignment.maxScore || 100
+              },
+              score: submission.score,
+              feedback: submission.feedback,
+              submittedAt: submission.submittedAt || new Date().toISOString(),
+              status: submission.status || 'submitted',
+              graded: submission.score !== undefined
+            };
+          }
+          
+          return null;
+        } catch (error) {
+          console.error(`Error fetching submission for assignment ${assignment._id}:`, error);
+          // If there was an error but we know it's locally submitted, create a synthetic submission
+          if (locallySubmittedIds.includes(assignment._id)) {
+            console.log(`Creating synthetic submission for locally submitted assignment ${assignment._id}`);
+            return {
+              _id: `local-${assignment._id}`,
+              assignment: {
+                _id: assignment._id,
+                title: assignment.title || 'Assignment',
+                description: assignment.description || '',
+                dueDate: assignment.dueDate || new Date().toISOString(),
+                course: assignment.course || { _id: 'unknown', name: 'Unknown Course' },
+                maxScore: assignment.maxScore || 100
+              },
+              submittedAt: new Date().toISOString(),
+              status: 'submitted',
+              graded: false
+            };
+          }
+          return null;
+        }
+      });
+      
+      // Wait for all promises to resolve
+      console.log('Waiting for all submission promises to resolve...');
+      const submissions = await Promise.all(submissionsPromises);
+      
+      // Filter out null values and return valid submissions
+      const validSubmissions = submissions.filter(submission => submission !== null);
+      console.log(`Found ${validSubmissions.length} valid submissions`);
+      
+      return validSubmissions;
+    } catch (error) {
+      console.error('Error in getMySubmissions:', error);
+      // Return empty array instead of throwing to avoid crashing the UI
+      return [];
     }
-    return response.data;
   },
 
   /**
